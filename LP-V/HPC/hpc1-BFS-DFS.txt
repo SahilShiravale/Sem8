@@ -1,0 +1,278 @@
+%%writefile BFSDFS.cpp
+
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <stack>
+#include <omp.h>
+using namespace std;
+
+class Graph {
+    int V;
+    vector<vector<int>> adj;
+
+public:
+    Graph(int V) : V(V), adj(V) {}
+    void addEdge(int u, int v) { adj[u].push_back(v), adj[v].push_back(u); }
+
+    void parallelBFS(int start) {
+        vector<bool> vis(V, false); queue<int> q;
+        vis[start] = true; q.push(start);
+        cout << "Parallel BFS: ";
+        while (!q.empty()) {
+            int n = q.size(); vector<int> level(n);
+            for (int i = 0; i < n; ++i) level[i] = q.front(), q.pop();
+            #pragma omp parallel for
+            for (int i = 0; i < n; ++i) {
+                int u = level[i];
+                #pragma omp critical
+                cout << u << " ";
+                for (int v : adj[u]) {
+                    if (!vis[v]) {
+                        #pragma omp critical
+                        if (!vis[v]) vis[v] = true, q.push(v);
+                    }
+                }
+            }
+        }
+        cout << endl;
+    }
+
+    void parallelDFS(int start) {
+        vector<bool> vis(V, false); stack<int> s; s.push(start);
+        cout << "Parallel DFS: ";
+        while (!s.empty()) {
+            int u;
+            #pragma omp critical
+            { u = s.top(); s.pop(); }
+            if (!vis[u]) {
+                vis[u] = true;
+                #pragma omp critical
+                cout << u << " ";
+                #pragma omp parallel for
+                for (int i = 0; i < adj[u].size(); ++i) {
+                    int v = adj[u][i];
+                    if (!vis[v]) {
+                        #pragma omp critical
+                        s.push(v);
+                    }
+                }
+            }
+        }
+        cout << endl;
+    }
+};
+
+int main() {
+    Graph g(6);
+    g.addEdge(0,1); g.addEdge(0,2); g.addEdge(1,3);
+    g.addEdge(1,4); g.addEdge(2,5);
+    g.parallelBFS(0); g.parallelDFS(0);
+}
+
+//!g++ -fopenmp BFSDFS.cpp -o run
+//!./run
+explain the above code step by step, tell how parallelism is achieved, its benefits against sequential execution
+The provided code implements Parallel Breadth-First Search (BFS) and Parallel Depth-First Search (DFS) using OpenMP on an undirected graph, encapsulated in a `Graph` class. It uses `%%writefile BFSDFS.cpp` to save the code in a Jupyter Notebook environment and includes commands to compile (`g++ -fopenmp BFSDFS.cpp -o run`) and run (`./run`). Below, I’ll explain the code step by step, describe how parallelism is achieved, highlight benefits over sequential execution, and confirm the use of existing algorithms and performance considerations.
+
+
+
+ Step-by-Step Explanation of the Code
+
+1. File Creation with `%%writefile`:
+   - The `%%writefile BFSDFS.cpp` command in a Jupyter Notebook creates or overwrites a file named `BFSDFS.cpp` with the code in the cell.
+   - This saves the C++ code for later compilation and execution.
+
+2. Header Files and Namespace:
+   - Includes: `<iostream>`, `<vector>`, `<queue>`, `<stack>`, `<omp.h>` for I/O, dynamic arrays, queue (BFS), stack (DFS), and OpenMP parallelism.
+   - `using namespace std;`: Avoids prefixing standard library components (e.g., `std::cout`).
+
+3. Graph Class:
+   - Definition: `class Graph` encapsulates an undirected graph.
+   - Members:
+     - `V`: Number of vertices.
+     - `adj`: Adjacency list (`vector<vector<int>>`) storing neighbors for each vertex.
+   - Constructor: `Graph(int V)` initializes `V` and `adj` with `V` empty vectors.
+   - Method `addEdge(int u, int v)`: Adds an undirected edge by appending `v` to `u`’s adjacency list and `u` to `v`’s.
+
+4. Parallel BFS (`parallelBFS`):
+   - Input: Starting vertex (`start`).
+   - Logic:
+     - Initializes a `visited` array (`vis`) and a queue (`q`).
+     - Marks `start` as visited, pushes it to `q`.
+     - While queue is not empty:
+       - Gets the number of nodes in the current level (`n = q.size()`).
+       - Creates a `level` vector to store nodes from the current level.
+       - Pops `n` nodes from `q` into `level`.
+       - Parallel Loop:
+         - Iterates over nodes in `level` using `#pragma omp parallel for`.
+         - For each node `u`:
+           - Prints `u` (under `#pragma omp critical` for thread-safe output).
+           - Checks neighbors (`v`); if unvisited, marks as visited and pushes to `q` (both under `#pragma omp critical`).
+   - Output: Prints nodes in BFS order (level by level).
+
+5. Parallel DFS (`parallelDFS`):
+   - Input: Starting vertex (`start`).
+   - Logic:
+     - Initializes a `visited` array (`vis`) and a stack (`s`).
+     - Pushes `start` to `s`.
+     - While stack is not empty:
+       - Pops a node `u` from `s` (under `#pragma omp critical` for thread safety).
+       - If `u` is unvisited:
+         - Marks `u` as visited.
+         - Prints `u` (under `#pragma omp critical`).
+         - Parallel Loop:
+           - Iterates over `u`’s neighbors using `#pragma omp parallel for`.
+           - For each neighbor `v`, if unvisited, pushes `v` to `s` (under `#pragma omp critical`).
+   - Output: Prints nodes in DFS order (stack-based).
+
+6. Main Function:
+   - Creates a graph with 6 vertices (`Graph g(6)`).
+   - Adds edges: `(0,1)`, `(0,2)`, `(1,3)`, `(1,4)`, `(2,5)` (undirected).
+   - Calls `parallelBFS(0)` and `parallelDFS(0)` to perform traversals starting from vertex 0.
+   - Note: Lacks performance measurement (e.g., `omp_get_wtime()`) and sequential implementations.
+
+7. Compilation and Execution Commands:
+   - `!g++ -fopenmp BFSDFS.cpp -o run`: Compiles the code with OpenMP support, creating an executable named `run`.
+   - `!./run`: Runs the executable, executing BFS and DFS and printing traversal orders.
+
+
+
+ How Parallelism is Achieved
+
+# Parallel BFS
+- Mechanism:
+  - Directive: `#pragma omp parallel for`.
+  - Where: In the loop over nodes in the current level (`for (int i = 0; i < n; ++i)`).
+  - How:
+    - Threads process nodes in the current level concurrently (e.g., thread 1 handles node `u1`, thread 2 handles `u2`).
+    - Each thread checks neighbors, marks unvisited ones, and enqueues them.
+  - Thread Safety:
+    - `#pragma omp critical` ensures:
+      - Thread-safe printing (`cout << u`).
+      - Safe updates to `vis` and `q` (double-checked to avoid race conditions).
+- Process:
+  - Nodes in each level are processed in parallel, but levels are sequential to maintain BFS’s level-by-level order.
+
+# Parallel DFS
+- Mechanism:
+  - Directive: `#pragma omp parallel for`.
+  - Where: In the loop over neighbors of the current node (`for (int i = 0; i < adj[u].size(); ++i)`).
+  - How:
+    - Threads process neighbors of the current node concurrently, pushing unvisited neighbors to the stack.
+    - Stack operations (pop/push) and printing are protected by `#pragma omp critical`.
+  - Thread Safety:
+    - `#pragma omp critical` ensures:
+      - Safe stack pop (`s.pop()`).
+      - Safe printing (`cout << u`).
+      - Safe stack push (`s.push(v)`).
+- Process:
+  - Parallelizes neighbor exploration, but stack-based processing remains sequential.
+
+
+
+ Benefits of Parallelism vs. Sequential Execution
+
+# General Benefits
+- Speedup:
+  - Parallel execution uses multiple CPU cores, reducing computation time for large graphs.
+  - Sequential execution uses one core, processing nodes/neighbors one at a time.
+- Scalability:
+  - Parallel versions scale with graph size and core count, ideal for large datasets in HPC.
+  - Sequential versions become slower as graph size increases.
+
+# BFS-Specific Benefits
+- Parallel BFS:
+  - Processes all nodes in a level concurrently, leveraging multiple threads.
+  - Benefit: For graphs with high branching (many nodes per level), parallelism significantly reduces time per level.
+  - Sequential BFS: Processes one node at a time, slower for large levels.
+  - Example: In a graph with 1000 nodes in a level, parallel BFS splits work across cores (e.g., 4 cores process 250 nodes each), while sequential BFS processes all 1000 sequentially.
+
+# DFS-Specific Benefits
+- Parallel DFS:
+  - Parallelizes neighbor exploration for each node, pushing unvisited neighbors to the stack concurrently.
+  - Benefit: Useful for graphs with many neighbors per node, as threads handle neighbors simultaneously.
+  - Sequential DFS: Processes neighbors one by one, slower for high-degree nodes.
+  - Limitation: DFS parallelism is less effective than BFS due to its sequential stack-based nature and critical sections, which limit concurrent work.
+
+# Quantitative Benefits
+- Small Graphs (e.g., 6 vertices in the code):
+  - Sequential may be faster due to parallel overhead (thread creation, critical sections).
+- Large Graphs (e.g., thousands of nodes/edges):
+  - Parallel versions show speedup, especially BFS, as more nodes are processed concurrently.
+- HPC Context: Parallelism is critical for large-scale graph processing (e.g., social networks, neural network graphs).
+
+
+
+ Limitations of Provided Code
+- No Sequential Implementation: Lacks sequential BFS/DFS for direct comparison.
+- No Performance Measurement: Doesn’t use `omp_get_wtime()` to time executions.
+- Critical Sections Overhead: Frequent `#pragma omp critical` in BFS and DFS reduces parallelism benefits due to synchronization.
+- Fixed Graph: Hard-coded graph limits testing flexibility.
+
+
+
+ Use of Existing Algorithms
+- BFS:
+  - Parallel: Level-synchronized BFS, a standard parallel variant where nodes in each level are processed concurrently.
+  - Sequential Equivalent: Queue-based BFS (not implemented but standard).
+- DFS:
+  - Parallel: Stack-based DFS with parallel neighbor exploration, a less common but valid parallel approach.
+  - Sequential Equivalent: Stack-based or recursive DFS (not implemented but standard).
+- Relevance: Both are adaptations of classic graph traversal algorithms, optimized for OpenMP.
+
+
+
+ Compilation and Execution
+- In Jupyter Notebook:
+  - The cell with `%%writefile BFSDFS.cpp` saves the code.
+  - Run compilation and execution in separate cells:
+    ```jupyter
+    !g++ -fopenmp BFSDFS.cpp -o run
+    !./run
+    ```
+  - Output (for the hard-coded graph):
+    ```
+    Parallel BFS: 0 1 2 3 4 5
+    Parallel DFS: [varies, e.g., 0 2 5 1 4 3]
+    ```
+    (DFS order may vary due to parallel stack pushes.)
+
+- In Terminal:
+  - Save the code to `BFSDFS.cpp` (without `%%writefile`).
+  - Compile and run:
+    ```bash
+    g++ -fopenmp BFSDFS.cpp -o run
+    ./run
+    ```
+
+
+
+ Improving the Code
+To better evaluate parallelism benefits, the code could:
+- Add sequential BFS/DFS implementations.
+- Measure execution time with `omp_get_wtime()`.
+- Allow user input for graph size and edges.
+- Reduce critical sections (e.g., batch printing, use thread-local queues/stacks).
+
+
+
+ Relevance to HPC
+- High Performance Computing: OpenMP enables multi-core parallelism, optimizing graph traversals for large datasets, a key HPC technique.
+- Deep Learning: Graph traversals are used in graph neural networks and data preprocessing, though this code is more HPC-focused.
+- Performance Potential: With timing and larger graphs, the code could demonstrate significant parallel speedup.
+
+
+
+ Summary
+- Code: Implements parallel BFS (level-synchronized) and DFS (stack-based) using OpenMP in a `Graph` class.
+- Parallelism:
+  - BFS: Parallelizes level node processing with `#pragma omp parallel for`.
+  - DFS: Parallelizes neighbor exploration with `#pragma omp parallel for`.
+  - Thread safety via `#pragma omp critical`.
+- Benefits:
+  - Faster for large graphs (BFS > DFS due to more parallel work).
+  - Scales with cores, unlike sequential execution.
+- Execution: Use `%%writefile` in Jupyter to save, then compile (`g++ -fopenmp`) and run (`./run`).
+
+If you want a version with sequential implementations, timing, or user input, let me know!

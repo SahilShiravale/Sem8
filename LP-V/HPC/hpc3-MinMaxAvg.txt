@@ -1,0 +1,252 @@
+%%writefile MinMaxAvgSum.cpp
+#include <iostream>
+#include <vector>
+#include <omp.h>
+using namespace std;
+
+int main() {
+    vector<double> arr(10);
+    omp_set_num_threads(4);
+
+    for (int i = 0; i < 10; ++i) arr[i] = 2.0 + i;
+
+    // Print active threads
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        cout << "Thread " << tid << " is active\n";
+    }
+
+    double max_val = 0.0, min_val = 1000.0, sum = 0.0;
+
+    #pragma omp parallel for reduction(max:max_val) reduction(min:min_val) reduction(+:sum)
+    for (int i = 0; i < 10; ++i) {
+        int tid = omp_get_thread_num();
+        cout << "Thread " << tid << " working on i = " << i << "\n";
+        if (arr[i] > max_val) max_val = arr[i];
+        if (arr[i] < min_val) min_val = arr[i];
+        sum += arr[i];
+    }
+
+    double avg = sum / arr.size();
+    cout << "\nMax = " << max_val << "\nMin = " << min_val
+              << "\nSum = " << sum << "\nAvg = " << avg << endl;
+
+    return 0;
+}
+
+//!g++ -fopenmp MinMaxAvgSum.cpp -o MinMaxAvgSum
+//!./MinMaxAvgSum
+
+The provided code implements Parallel Reduction to compute the Maximum, Minimum, Sum, and Average of a fixed-size array of doubles using OpenMP. It uses the Jupyter Notebook magic command `%%writefile MinMaxAvgSum.cpp` to save the code, followed by commands to compile (`g++ -fopenmp MinMaxAvgSum.cpp -o MinMaxAvgSum`) and run (`./MinMaxAvgSum`). Below, I’ll explain the code step by step, describe how parallelism is achieved, highlight benefits over sequential execution, confirm the use of existing algorithms, and address performance measurement.
+
+
+
+ Step-by-Step Explanation of the Code
+
+1. File Creation with `%%writefile`:
+   - `%%writefile MinMaxAvgSum.cpp` saves the code to `MinMaxAvgSum.cpp` in the Jupyter Notebook’s working directory.
+   - This allows compilation and execution later.
+
+2. Header Files and Namespace:
+   - Includes: `<iostream>`, `<vector>`, `<omp.h>` for I/O, dynamic arrays, and OpenMP parallelism.
+   - `using namespace std;`: Avoids prefixing standard library components (e.g., `std::cout`).
+
+3. Main Function Setup:
+   - Array Initialization:
+     - Creates a `vector<double> arr(10)` with 10 elements.
+     - Fills it with values: `arr[i] = 2.0 + i` (i.e., `{2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0}`).
+   - Thread Configuration:
+     - `omp_set_num_threads(4)`: Sets the number of threads to 4 for OpenMP parallel regions.
+
+4. Print Active Threads:
+   - Parallel Region: `#pragma omp parallel`.
+     - Creates a parallel region where each thread executes the enclosed block.
+     - `int tid = omp_get_thread_num()`: Gets the thread ID (0 to 3, since 4 threads).
+     - Prints: `Thread <tid> is active` (e.g., `Thread 0 is active`, `Thread 1 is active`, etc.).
+   - Purpose: Verifies that multiple threads are active.
+
+5. Parallel Reduction:
+   - Variables:
+     - `max_val = 0.0`: Initial maximum (too low, but reduction will correct it).
+     - `min_val = 1000.0`: Initial minimum (high, but reduction will correct it).
+     - `sum = 0.0`: Initial sum.
+   - Parallel Loop:
+     - Directive: `#pragma omp parallel for reduction(max:max_val) reduction(min:min_val) reduction(+:sum)`.
+     - Loop: Iterates over `i` from 0 to 9 (array indices).
+     - Actions:
+       - Prints thread activity: `Thread <tid> working on i = <i>` (shows which thread processes which index).
+       - Updates `max_val` if `arr[i]` is larger (redundant due to reduction clause).
+       - Updates `min_val` if `arr[i]` is smaller (redundant).
+       - Adds `arr[i]` to `sum`.
+     - Reduction Clauses:
+       - `max:max_val`: Each thread computes a local maximum; OpenMP combines them to find the global maximum.
+       - `min:min_val`: Each thread computes a local minimum; OpenMP finds the global minimum.
+       - `+:sum`: Each thread computes a local sum; OpenMP adds them for the global sum.
+   - Thread Safety: Reduction clauses ensure safe updates without race conditions.
+
+6. Compute and Output Results:
+   - Average: `avg = sum / arr.size()` (sum divided by 10).
+   - Output:
+     - Prints: `Max = <max_val>`, `Min = <min_val>`, `Sum = <sum>`, `Avg = <avg>`.
+     - Example for `arr = {2.0, 3.0, ..., 11.0}`:
+       ```
+       Max = 11
+       Min = 2
+       Sum = 65
+       Avg = 6.5
+       ```
+
+7. Compilation and Execution:
+   - `!g++ -fopenmp MinMaxAvgSum.cpp -o MinMaxAvgSum`: Compiles the code with OpenMP support, creating an executable `MinMaxAvgSum`.
+   - `!./MinMaxAvgSum`: Runs the executable, printing thread activity and results.
+   - Example Output (order of thread messages may vary):
+     ```
+     Thread 0 is active
+     Thread 1 is active
+     Thread 2 is active
+     Thread 3 is active
+     Thread 0 working on i = 0
+     Thread 0 working on i = 1
+     Thread 1 working on i = 2
+     Thread 1 working on i = 3
+     Thread 2 working on i = 4
+     Thread 2 working on i = 5
+     Thread 3 working on i = 6
+     Thread 3 working on i = 7
+     Thread 0 working on i = 8
+     Thread 1 working on i = 9
+
+     Max = 11
+     Min = 2
+     Sum = 65
+     Avg = 6.5
+     ```
+
+
+
+ How Parallelism is Achieved
+- Mechanism:
+  - Directive: `#pragma omp parallel for reduction(max:max_val) reduction(min:min_val) reduction(+:sum)`.
+  - Parallel For: Splits the loop (`i = 0` to `9`) across 4 threads (e.g., thread 0 handles indices 0–2, thread 1 handles 3–5, etc.).
+  - Reduction:
+    - Each thread computes local `max_val`, `min_val`, and `sum` for its assigned indices.
+    - OpenMP combines:
+      - `max`: Takes the largest local maximum.
+      - `min`: Takes the smallest local minimum.
+      - `+`: Adds local sums.
+  - Thread Safety: Reduction clauses prevent race conditions by managing private copies and combining results.
+- Thread Activity:
+  - The `#pragma omp parallel` block confirms 4 threads are active.
+  - Loop messages show threads processing different indices concurrently.
+- Process:
+  - Example: For 10 elements with 4 threads:
+    - Thread 0: Processes `arr[0], arr[1], arr[8]` (due to dynamic scheduling).
+    - Thread 1: Processes `arr[2], arr[3], arr[9]`.
+    - Threads compute local reductions, merged by OpenMP.
+
+
+
+ Benefits of Parallelism vs. Sequential Execution
+
+# General Benefits
+- Speedup:
+  - Parallel execution uses multiple cores (4 threads), reducing computation time.
+  - Sequential execution uses one core, processing all elements linearly.
+- Scalability:
+  - Parallel version scales with array size and core count, ideal for HPC.
+  - Sequential version slows linearly with input size.
+
+# Specific Benefits
+- Parallel Reduction:
+  - Benefit: Divides the array across threads, computing local max/min/sum concurrently.
+    - Example: With 4 threads, each processes ~2.5 elements (10/4), potentially quartering computation time.
+  - Sequential Reduction: Processes all 10 elements one by one, taking longer for large arrays.
+- Efficiency:
+  - Reduction clauses optimize combining results, minimizing synchronization overhead.
+  - For small arrays (like 10 elements), speedup is minimal due to thread creation overhead.
+- Large Arrays:
+  - For larger arrays (e.g., 10000 elements), parallelism significantly reduces time, as threads process more elements concurrently.
+  - Example: Sequential might take 0.001s, parallel 0.0003s with 4 cores (hypothetical).
+
+# Limitations
+- Small Array (10 elements):
+  - Parallel overhead (thread creation, reduction combining) may make sequential faster.
+  - The code’s small size limits observable speedup.
+- DFS/BFS Context: Unlike graph traversals (BFS/DFS), reduction is highly parallelizable, offering better speedup for large datasets.
+
+
+
+ Use of Existing Algorithms
+- Algorithm: Parallel reduction for Max, Min, Sum, Average.
+- Sequential Equivalent: Standard iterative reduction (loop over array, updating max/min/sum).
+- Parallel: OpenMP reduction, a standard HPC technique for aggregating data.
+- Relevance: Reduction is fundamental in HPC for tasks like data analysis and statistics.
+
+
+
+ Performance Measurement
+- Limitation: The code does not measure performance (no `omp_get_wtime()` for timing).
+- Thread Activity: Printing thread IDs and indices shows parallelism but doesn’t quantify speedup.
+- Improvement Needed:
+  - Add `omp_get_wtime()` to measure sequential and parallel times.
+  - Include a sequential reduction function for comparison.
+- Expected Behavior:
+  - For 10 elements, sequential may be faster due to overhead.
+  - For large arrays, parallel would show speedup (e.g., 4x faster with 4 cores, ideally).
+
+
+
+ Compilation and Execution
+- In Jupyter Notebook:
+  - Run the cell with `%%writefile MinMaxAvgSum.cpp` to save the code.
+  - Compile and run in separate cells:
+    ```jupyter
+    !g++ -fopenmp MinMaxAvgSum.cpp -o MinMaxAvgSum
+    !./MinMaxAvgSum
+    ```
+  - Output shows thread activity and results (as above).
+
+- In Terminal:
+  - Save the code to `MinMaxAvgSum.cpp` (omit `%%writefile`).
+  - Compile and run:
+    ```bash
+    g++ -fopenmp MinMaxAvgSum.cpp -o MinMaxAvgSum
+    ./MinMaxAvgSum
+    ```
+
+
+
+ Limitations and Improvements
+- Limitations:
+  - No performance measurement (no `omp_get_wtime()`).
+  - No sequential implementation for comparison.
+  - Fixed small array (10 elements) limits parallelism benefits.
+  - Redundant checks (`if (arr[i] > max_val)`) since reduction clauses handle updates.
+  - Thread output may interleave, making it hard to read.
+- Improvements:
+  - Add sequential reduction and `omp_get_wtime()` for timing.
+  - Use user input for array size.
+  - Remove redundant checks in the parallel loop.
+  - Buffer thread output to avoid interleaving.
+
+
+
+ Relevance to HPC
+- High Performance Computing: OpenMP reduction leverages multi-core CPUs, optimizing data aggregation, a core HPC technique.
+- Deep Learning: Not directly related, but reduction is used in data preprocessing (e.g., computing statistics for datasets).
+- Performance Potential: With timing and larger arrays, the code could demonstrate significant parallel speedup.
+
+
+
+ Summary
+- Code: Computes Max, Min, Sum, Average of a 10-element array using OpenMP parallel reduction.
+- Parallelism:
+  - `#pragma omp parallel for` with `reduction` splits array processing across 4 threads.
+  - Safe aggregation of max/min/sum via reduction clauses.
+- Benefits:
+  - Faster for large arrays by distributing work across cores.
+  - Limited benefit for small arrays (10 elements) due to overhead.
+- Execution: Save with `%%writefile`, compile (`g++ -fopenmp`), run (`./MinMaxAvgSum`).
+
+If you want a version with sequential implementation, performance timing, or user input, let me know!

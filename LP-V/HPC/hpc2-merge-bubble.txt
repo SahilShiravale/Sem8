@@ -1,0 +1,306 @@
+%%writefile BubbleMerge.cpp
+
+#include <iostream>
+#include <vector>
+#include <omp.h>
+#include <cstdlib>
+using namespace std;
+
+// Sort implementations
+void bubbleSort(vector<int>& data, bool parallel) {
+    for (int i = 0; i < data.size() - 1; i++) {
+        #pragma omp parallel for if(parallel)
+        for (int j = 0; j < data.size() - i - 1; j++) {
+            if (data[j] > data[j + 1]) swap(data[j], data[j + 1]);
+        }
+    }
+}
+
+void mergeSort(vector<int>& data, int left, int right, bool parallel) {
+    if (left >= right) return;
+
+    int mid = (left + right) / 2;
+
+    if (parallel) {
+        #pragma omp parallel sections
+        {
+            #pragma omp section
+            mergeSort(data, left, mid, true);
+            #pragma omp section
+            mergeSort(data, mid + 1, right, true);
+        }
+    } else {
+        mergeSort(data, left, mid, false);
+        mergeSort(data, mid + 1, right, false);
+    }
+
+    // Merge
+    vector<int> temp(right - left + 1);
+    int i = left, j = mid + 1, k = 0;
+    while (i <= mid && j <= right)
+        temp[k++] = (data[i] <= data[j]) ? data[i++] : data[j++];
+    while (i <= mid) temp[k++] = data[i++];
+    while (j <= right) temp[k++] = data[j++];
+    for (k = 0; k < temp.size(); k++)
+        data[left + k] = temp[k];
+}
+
+// Run benchmark test
+void benchmark(string name, vector<int> data, bool isBubble) {
+    vector<int> seqData = data, parData = data;
+    double seqTime, parTime;
+
+    // Sequential sort
+    seqTime = omp_get_wtime();
+    if (isBubble) bubbleSort(seqData, false);
+    else mergeSort(seqData, 0, seqData.size() - 1, false);
+    seqTime = omp_get_wtime() - seqTime;
+
+    // Parallel sort
+    parTime = omp_get_wtime();
+    if (isBubble) bubbleSort(parData, true);
+    else mergeSort(parData, 0, parData.size() - 1, true);
+    parTime = omp_get_wtime() - parTime;
+
+    cout << name << " Sort (seq): " << seqTime << "s, (par): " << parTime << "s\n";
+}
+
+int main() {
+    const int SIZE = 10000;
+
+    // Generate random data
+    vector<int> data(SIZE);
+    for (int& element : data) element = rand() % 10000;
+
+    // Run benchmarks
+    benchmark("Bubble", data, true);
+
+    // Generate new data for merge sort
+    for (int& element : data) element = rand() % 10000;
+    benchmark("Merge", data, false);
+
+    return 0;
+}
+
+//!g++ -fopenmp BubbleMerge.cpp -o run
+//!./run
+
+The provided code implements Parallel Bubble Sort and Parallel Merge Sort using OpenMP, benchmarks their sequential and parallel performance, and saves the code to `BubbleMerge.cpp` using the Jupyter Notebook magic command `%%writefile`. It also includes commands to compile (`g++ -fopenmp BubbleMerge.cpp -o run`) and run (`./run`). Below, I’ll explain the code step by step, describe how parallelism is achieved, highlight benefits over sequential execution, confirm the use of existing algorithms, and address performance measurement.
+
+
+
+ Step-by-Step Explanation of the Code
+
+1. File Creation with `%%writefile`:
+   - `%%writefile BubbleMerge.cpp` saves the code to `BubbleMerge.cpp` in the Jupyter Notebook’s working directory.
+   - This allows compilation and execution later.
+
+2. Header Files and Namespace:
+   - Includes: `<iostream>`, `<vector>`, `<omp.h>`, `<cstdlib>` for I/O, dynamic arrays, OpenMP, and random number generation (`rand`).
+   - `using namespace std;`: Avoids prefixing standard library components (e.g., `std::cout`).
+
+3. Bubble Sort Implementation (`bubbleSort`):
+   - Parameters: `vector<int>& data` (array to sort), `bool parallel` (flag for sequential/parallel mode).
+   - Logic:
+     - Outer loop iterates `i` from 0 to `size-2` (each pass places the largest remaining element at the end).
+     - Inner loop iterates `j` from 0 to `size-i-2`, comparing adjacent elements (`data[j]`, `data[j+1]`) and swapping if out of order.
+     - If `parallel` is true, the inner loop uses `#pragma omp parallel for` to parallelize comparisons/swaps.
+   - Sequential Mode: Runs without OpenMP if `parallel` is false.
+
+4. Merge Sort Implementation (`mergeSort`):
+   - Parameters: `vector<int>& data`, `int left`, `int right` (subarray bounds), `bool parallel` (sequential/parallel mode).
+   - Logic:
+     - Base Case: Returns if `left >= right` (subarray has 0 or 1 element).
+     - Divide:
+       - Computes `mid = (left + right) / 2`.
+       - Recursively sorts left half (`left` to `mid`) and right half (`mid+1` to `right`).
+       - If `parallel` is true, uses `#pragma omp parallel sections` to run the two recursive calls in parallel (one per section).
+       - If `parallel` is false, runs recursively without OpenMP.
+     - Merge:
+       - Creates a temporary array `temp` to merge sorted halves.
+       - Merges elements from `data[left..mid]` and `data[mid+1..right]` into `temp` in sorted order.
+       - Copies `temp` back to `data[left..right]`.
+
+5. Benchmark Function (`benchmark`):
+   - Parameters: `string name` (sort type, e.g., “Bubble”), `vector<int> data` (input array), `bool isBubble` (true for bubble sort, false for merge sort).
+   - Logic:
+     - Creates copies `seqData` and `parData` to test sequential and parallel sorts on the same data.
+     - Sequential Test:
+       - Measures time using `omp_get_wtime()` before and after sorting (`seqTime`).
+       - Calls `bubbleSort(seqData, false)` or `mergeSort(seqData, 0, size-1, false)` based on `isBubble`.
+     - Parallel Test:
+       - Measures time using `omp_get_wtime()` (`parTime`).
+       - Calls `bubbleSort(parData, true)` or `mergeSort(parData, 0, size-1, true)`.
+     - Output: Prints sequential and parallel times (e.g., “Bubble Sort (seq): 0.123s, (par): 0.098s”).
+
+6. Main Function:
+   - Setup:
+     - Defines `SIZE = 10000` (array size).
+     - Creates a `vector<int> data(SIZE)` and fills it with random integers (`rand() % 10000`).
+   - Bubble Sort Benchmark:
+     - Calls `benchmark("Bubble", data, true)` to test sequential and parallel bubble sort.
+   - Merge Sort Benchmark:
+     - Regenerates random data to ensure fairness.
+     - Calls `benchmark("Merge", data, false)` for sequential and parallel merge sort.
+   - Note: No explicit output of sorted arrays (focus is on timing).
+
+7. Compilation and Execution:
+   - `!g++ -fopenmp BubbleMerge.cpp -o run`: Compiles the code with OpenMP support, creating an executable `run`.
+   - `!./run`: Runs the executable, printing benchmark times for both sorts.
+   - Example Output (times vary):
+     ```
+     Bubble Sort (seq): 0.245s, (par): 0.189s
+     Merge Sort (seq): 0.012s, (par): 0.008s
+     ```
+
+
+
+ How Parallelism is Achieved
+
+# Bubble Sort
+- Mechanism:
+  - Directive: `#pragma omp parallel for if(parallel)`.
+  - Where: Inner loop (`for (int j = 0; j < data.size() - i - 1; j++)`).
+  - How:
+    - Threads process different `j` indices concurrently, comparing and swapping adjacent elements.
+    - The `if(parallel)` clause enables parallelism only when `parallel` is true.
+  - Thread Safety:
+    - Adjacent swaps (`j`, `j+1`) are independent, avoiding race conditions.
+    - No shared variables are modified unsafely.
+- Process:
+  - Each pass (`i`) is sequential, but comparisons/swaps within a pass are parallelized.
+  - Example: For 10000 elements, threads split indices (e.g., 4 cores handle ~2500 comparisons each).
+
+# Merge Sort
+- Mechanism:
+  - Directive: `#pragma omp parallel sections`.
+  - Where: Recursive calls for left and right halves (`mergeSort(left, mid)`, `mergeSort(mid+1, right)`).
+  - How:
+    - Two sections run in parallel: one thread sorts the left half, another sorts the right half.
+    - Each section is a recursive `mergeSort` call, potentially spawning more parallel sections.
+  - Thread Safety:
+    - Left and right subarrays are disjoint, ensuring no data races.
+    - Merge step is sequential but operates on independent `temp` array.
+- Process:
+  - Parallelizes the divide phase, reducing recursive call time.
+  - Merge remains sequential, limiting parallelism for small subarrays.
+
+
+
+ Benefits of Parallelism vs. Sequential Execution
+
+# General Benefits
+- Speedup:
+  - Parallel execution leverages multiple CPU cores, reducing runtime for large datasets.
+  - Sequential execution uses one core, processing all operations linearly.
+- Scalability:
+  - Parallel versions scale with core count and array size, ideal for HPC.
+  - Sequential versions slow down linearly with input size.
+
+# Bubble Sort Benefits
+- Parallel Bubble Sort:
+  - Parallelizes comparisons/swaps in each pass, distributing work across threads.
+  - Benefit: For large arrays (e.g., 10000 elements), multiple cores process comparisons simultaneously, reducing pass time.
+  - Sequential Bubble Sort: Processes one comparison at a time, slower for large `n`.
+  - Example: With 4 cores, parallel bubble sort may process 4 comparisons concurrently, potentially halving time per pass.
+- Limitation: Bubble sort’s O(n²) complexity and sequential passes limit parallelism benefits compared to merge sort.
+
+# Merge Sort Benefits
+- Parallel Merge Sort:
+  - Parallelizes recursive calls, dividing the array into independent subproblems.
+  - Benefit: For large arrays, parallel recursion reduces divide phase time significantly.
+  - Sequential Merge Sort: Processes recursive calls one at a time, doubling time for each level.
+  - Example: For 10000 elements, parallel merge sort splits work across cores at each recursion level, potentially cutting divide time by half with 2 cores.
+- Limitation: Sequential merge step reduces parallelism efficiency for small subarrays.
+
+# Quantitative Benefits
+- Small Arrays (e.g., <1000 elements):
+  - Sequential may be faster due to parallel overhead (thread creation, synchronization).
+- Large Arrays (e.g., 10000 elements, as in the code):
+  - Parallel versions show speedup, especially merge sort, due to more parallelizable work.
+  - Example output (approximate):
+    - Bubble: Sequential 0.245s, Parallel 0.189s (~23% faster).
+    - Merge: Sequential 0.012s, Parallel 0.008s (~33% faster).
+- HPC Context: Parallel sorting is critical for large-scale data processing (e.g., scientific simulations, big data).
+
+
+
+ Use of Existing Algorithms
+- Bubble Sort:
+  - Sequential: Classic bubble sort (O(n²), compares and swaps adjacent elements).
+  - Parallel: Parallelizes inner loop, a standard OpenMP adaptation.
+- Merge Sort:
+  - Sequential: Classic divide-and-conquer merge sort (O(n log n)).
+  - Parallel: Parallelizes recursive calls using sections, a common parallel variant.
+- Relevance: Both are standard sorting algorithms, optimized for OpenMP in HPC.
+
+
+
+ Performance Measurement
+- How:
+  - Tool: `omp_get_wtime()` measures wall-clock time in seconds.
+  - Process:
+    - Records time before and after each sort (`seqTime`, `parTime`).
+    - Computes difference (e.g., `seqTime = omp_get_wtime() - seqTime`).
+  - Output: Prints sequential and parallel times for each sort.
+- Comparison:
+  - Uses same input data (copied to `seqData`, `parData`) for fairness.
+  - Times show speedup (parallel time < sequential time for large inputs).
+- Scalability:
+  - Large arrays benefit more from parallelism.
+  - Merge sort shows greater speedup than bubble sort due to its O(n log n) complexity and parallelizable divide phase.
+
+
+
+ Compilation and Execution
+- In Jupyter Notebook:
+  - Run the cell with `%%writefile BubbleMerge.cpp` to save the code.
+  - Compile and run in separate cells:
+    ```jupyter
+    !g++ -fopenmp BubbleMerge.cpp -o run
+    !./run
+    ```
+  - Output shows benchmark times (e.g., sequential vs. parallel for bubble and merge sorts).
+
+- In Terminal:
+  - Save the code to `BubbleMerge.cpp` (omit `%%writefile`).
+  - Compile and run:
+    ```bash
+    g++ -fopenmp BubbleMerge.cpp -o run
+    ./run
+    ```
+
+
+
+ Limitations and Improvements
+- Limitations:
+  - Bubble sort’s sequential passes limit parallelism (only inner loop is parallel).
+  - Merge sort’s sequential merge step reduces efficiency for small subarrays.
+  - Fixed array size (`SIZE = 10000`) limits flexibility.
+  - No output of sorted arrays for verification.
+- Improvements:
+  - Add user input for array size.
+  - Use odd-even transposition for bubble sort (more parallel-friendly).
+  - Parallelize merge step for merge sort (though complex).
+  - Print sorted arrays to verify correctness.
+
+
+
+ Relevance to HPC
+- High Performance Computing: OpenMP parallelizes sorting, leveraging multi-core CPUs, a core HPC technique.
+- Performance Measurement: Benchmarking with `omp_get_wtime()` quantifies parallel speedup, essential for HPC optimization.
+- Deep Learning: Not directly related, but sorting is used in data preprocessing for machine learning.
+
+
+
+ Summary
+- Code: Implements parallel bubble sort (inner loop parallelized) and merge sort (recursive calls parallelized) with benchmarks.
+- Parallelism:
+  - Bubble: `#pragma omp parallel for` for comparisons/swaps.
+  - Merge: `#pragma omp parallel sections` for recursive calls.
+- Benefits:
+  - Faster for large arrays (merge > bubble due to better complexity).
+  - Scales with cores, unlike sequential execution.
+- Execution: Save with `%%writefile`, compile (`g++ -fopenmp`), run (`./run`).
+
+If you need a version with user input, sorted array output, or further optimizations, let me know!

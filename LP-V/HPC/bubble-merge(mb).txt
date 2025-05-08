@@ -1,0 +1,199 @@
+#include <iostream>
+#include <vector>
+#include <omp.h>
+using namespace std;
+
+// Sequential Bubble Sort
+void sequential_bubble_sort(vector<int>& arr) {
+    int n = arr.size();
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (arr[j] > arr[j + 1]) {
+                swap(arr[j], arr[j + 1]);
+            }
+        }
+    }
+}
+
+// Parallel Bubble Sort (Odd-Even Transposition)
+void parallel_bubble_sort(vector<int>& arr) {
+    int n = arr.size();
+    bool isSorted = false;
+    while (!isSorted) {
+        isSorted = true;
+        // Odd phase: Compare and swap even-indexed pairs in parallel
+        #pragma omp parallel for reduction(&&: isSorted)
+        for (int i = 0; i < n - 1; i += 2) {
+            if (arr[i] > arr[i + 1]) {
+                swap(arr[i], arr[i + 1]);
+                isSorted = false;
+            }
+        }
+        // Even phase: Compare and swap odd-indexed pairs in parallel
+        #pragma omp parallel for reduction(&&: isSorted)
+        for (int i = 1; i < n - 1; i += 2) {
+            if (arr[i] > arr[i + 1]) {
+                swap(arr[i], arr[i + 1]);
+                isSorted = false;
+            }
+        }
+    }
+}
+
+// Print array for verification
+void print_array(const vector<int>& arr) {
+    for (int x : arr) cout << x << " ";
+    cout << endl;
+}
+
+int main() {
+    int n;
+    // Prompt user for array size
+    cout << "Enter number of elements: ";
+    cin >> n;
+    if (n <= 0) {
+        cout << "Invalid input." << endl;
+        return 1;
+    }
+
+    vector<int> arr(n), arr_copy;
+    // Prompt user for array elements
+    cout << "Enter " << n << " integers: ";
+    for (int i = 0; i < n; i++) cin >> arr[i];
+
+    double start, end;
+
+    // Measure Sequential Bubble Sort performance
+    arr_copy = arr;
+    start = omp_get_wtime();
+    sequential_bubble_sort(arr_copy);
+    end = omp_get_wtime();
+    cout << "Sequential Bubble Sort Time: " << end - start << "s\nSorted: ";
+    print_array(arr_copy);
+
+    // Measure Parallel Bubble Sort performance
+    arr_copy = arr;
+    start = omp_get_wtime();
+    parallel_bubble_sort(arr_copy);
+    end = omp_get_wtime();
+    cout << "Parallel Bubble Sort Time: " << end - start << "s\nSorted: ";
+    print_array(arr_copy);
+
+    return 0;
+}
+
+Explanation
+Purpose: Implements sequential and parallel merge sort with performance measurement.
+Sequential Merge Sort: Divides array recursively, sorts subarrays, and merges them.
+Parallel Merge Sort:
+Divides array recursively, parallelizing recursive calls.
+Merges subarrays sequentially (parallel merging is complex and often inefficient).
+User Input: Asks for array size and elements.
+Output: Prints sorted arrays and execution times.
+Parallelism
+Mechanism: #pragma omp task parallelizes recursive calls for left and right subarrays.
+How: #pragma omp parallel and #pragma omp single create a parallel region; tasks are distributed to threads.
+Synchronization: #pragma omp taskwait ensures recursive sorts complete before merging.
+Benefit: Speeds up the divide step for large arrays.
+Performance Measurement
+Sequential: Measures time for standard merge sort using omp_get_wtime().
+Parallel: Measures time for parallel merge sort.
+Comparison: Prints both times to compare speedup (parallel is faster for large n).
+Use of Existing Algorithms
+Bubble Sort: Uses the standard bubble sort for sequential and adapts it to odd-even transposition for parallel, a well-known parallel variant.
+Merge Sort: Uses the classic divide-and-conquer merge sort, with OpenMP tasks for parallelism, a standard approach.
+Measuring Performance
+Sequential vs. Parallel:
+Sequential runs use standard algorithms without OpenMP.
+Parallel runs use OpenMP directives to distribute work.
+Measurement:
+omp_get_wtime() captures start and end times.
+Time difference (end - start) is printed in seconds.
+Comparison:
+Each algorithm runs on the same input (via arr_copy).
+Outputs times and sorted arrays for analysis.
+Scalability:
+Small arrays may show sequential as faster due to parallel overhead.
+Large arrays (e.g., n > 1000) benefit from parallelism, showing speedup.
+Relevance to HPC
+Both codes use OpenMP to parallelize sorting, a key high performance computing technique.
+Performance measurement demonstrates parallel efficiency, critical for large-scale data processing.
+Not directly related to deep learning but relevant for HPC tasks like data sorting.
+Explanation of omp_get_wtime()
+What it is: A function in OpenMP that returns the current time in seconds (as a double).
+Purpose: Measures how long a piece of code takes to run.
+How it’s used:
+Call start = omp_get_wtime() before code.
+Call end = omp_get_wtime() after code.
+Compute end - start to get execution time in seconds.
+Why: Helps compare sequential vs. parallel performance.
+Key Components of the Codes
+1. Parallel Bubble Sort Code
+Purpose: Sorts an array using sequential and parallel bubble sort, measures time.
+Main Parts:
+User Input:
+Asks for array size (n) and elements.
+Validates n > 0.
+Sequential Bubble Sort:
+Compares adjacent elements, swaps if out of order.
+Repeats until no swaps needed.
+Parallel Bubble Sort (Odd-Even Transposition):
+Alternates between odd and even index pairs.
+Checks pairs like (0,1), (2,3) (odd phase) and (1,2), (3,4) (even phase).
+Stops when array is sorted (isSorted stays true).
+Print Array: Shows sorted array to verify correctness.
+Performance Measurement:
+Uses omp_get_wtime() to time sequential and parallel sorts.
+Prints times and sorted arrays.
+2. Parallel Merge Sort Code
+Purpose: Sorts an array using sequential and parallel merge sort, measures time.
+Main Parts:
+User Input:
+Asks for array size (n) and elements.
+Validates n > 0.
+Merge Function:
+Combines two sorted subarrays into one sorted array.
+Copies left and right halves to temporary arrays (L, R), then merges back.
+Sequential Merge Sort:
+Splits array into halves recursively until single elements.
+Merges sorted halves.
+Parallel Merge Sort:
+Splits array recursively, like sequential.
+Parallelizes recursive calls for left and right halves.
+Merges sequentially after recursive sorts finish.
+Print Array: Shows sorted array to verify correctness.
+Performance Measurement:
+Uses omp_get_wtime() to time sequential and parallel sorts.
+Prints times and sorted arrays.
+How Parallelism is Achieved
+Bubble Sort (Odd-Even Transposition):
+OpenMP Directive: #pragma omp parallel for.
+How: Splits odd/even phase comparisons across threads (e.g., thread 1 checks (0,1), thread 2 checks (2,3)).
+Thread Safety: reduction(&&: isSorted) combines isSorted flags (true only if all threads report no swaps).
+Benefit: Multiple pairs are compared simultaneously, faster for large arrays.
+Merge Sort:
+OpenMP Directives: #pragma omp task, #pragma omp parallel, #pragma omp single.
+How: Creates tasks for recursive left/right subarray sorts, run by different threads.
+Synchronization: #pragma omp taskwait ensures recursive sorts finish before merging.
+Benefit: Parallelizes recursive splitting, speeding up large arrays.
+Use of Existing Algorithms
+Bubble Sort:
+Sequential: Classic bubble sort (compares and swaps adjacent elements).
+Parallel: Odd-even transposition, a standard parallel variant of bubble sort.
+Merge Sort:
+Sequential: Standard divide-and-conquer merge sort.
+Parallel: Same algorithm, but recursive splits are parallelized using OpenMP tasks.
+Both are well-known algorithms adapted for parallelism with OpenMP.
+Measuring Performance
+Sequential vs. Parallel:
+Sequential: Runs standard algorithms without OpenMP.
+Parallel: Uses OpenMP to distribute work across threads.
+How:
+omp_get_wtime() records time before (start) and after (end) each sort.
+Prints end - start in seconds for sequential and parallel runs.
+Comparison:
+Uses same input array (via arr_copy) for fair comparison.
+Outputs times and sorted arrays to compare speed and correctness.
+What it Shows:
+Small arrays: Sequential may be faster due to parallel overhead.
+Large arrays (e.g., n > 1000): Parallel should be faster due to thread distribution.

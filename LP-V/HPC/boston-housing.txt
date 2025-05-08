@@ -1,0 +1,346 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Input, Dense
+
+# 1) Load and clean data
+df = pd.read_csv('/content/BostonHousing.csv')
+
+# Coerce non-numeric → NaN, then drop all NaNs or infinities
+df = df.apply(pd.to_numeric, errors='coerce')
+df.replace([np.inf, -np.inf], np.nan, inplace=True)
+df.dropna(inplace=True)
+
+# 2) Separate features & target (lower-case 'medv')
+X = df.drop('medv', axis=1).values
+y = df['medv'].values    # shape (n,)
+
+# 3) Train/test split (keep y_test unscaled for metrics/plots)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# 4) Scale features
+scaler_X = StandardScaler()
+X_train_s = scaler_X.fit_transform(X_train)
+X_test_s  = scaler_X.transform(X_test)
+
+# 5) Scale y_train only
+scaler_y = StandardScaler()
+y_train_s = scaler_y.fit_transform(y_train.reshape(-1,1))
+
+# 6) Build & train the DNN (1 neuron = linear regression)
+model = Sequential([
+    Input(shape=(X_train_s.shape[1],)),
+    Dense(1)
+])
+model.compile(optimizer='adam', loss='mse')
+model.fit(X_train_s, y_train_s, epochs=100, verbose=1)
+
+# 7) Predict & inverse-transform back to original scale
+y_pred_s = model.predict(X_test_s)
+y_pred = scaler_y.inverse_transform(y_pred_s).flatten()
+
+# 8) Print metrics
+mse = mean_squared_error(y_test, y_pred)
+mae = mean_absolute_error(y_test, y_pred)
+r2  = r2_score(y_test, y_pred)
+print(f"MSE: {mse:.2f}  MAE: {mae:.2f}  R²: {r2:.3f}")
+
+# 9) Sort for smooth line plots
+idx = np.argsort(y_test)
+y_true_sorted = y_test[idx]
+y_pred_sorted = y_pred[idx]
+
+# 10) Plot Actual Prices
+plt.figure(figsize=(10, 5))
+plt.plot(y_true_sorted, label='Actual', color='blue', linewidth=2)
+plt.xlabel("Sample Index")
+plt.ylabel("House Price")
+plt.title("Actual Boston Housing Prices")
+plt.legend()
+plt.show()
+
+# 11) Plot Predicted Prices
+plt.figure(figsize=(10, 5))
+plt.plot(y_pred_sorted, label='Predicted', color='orange', linewidth=2)
+plt.xlabel("Sample Index")
+plt.ylabel("House Price")
+plt.title("Predicted Boston Housing Prices")
+plt.legend()
+plt.show()
+
+This Python code uses a Deep Neural Network (DNN) to perform linear regression on the Boston Housing dataset to predict house prices (`medv`). It employs libraries like Pandas, NumPy, Matplotlib, Scikit-learn, and TensorFlow/Keras. The code is divided into 11 blocks, each explained below in simple language, covering what is used, its purpose, and key details.
+
+
+
+ Block-by-Block Explanation
+
+# 1. Load and Clean Data
+```python
+df = pd.read_csv('/content/BostonHousing.csv')
+df = df.apply(pd.to_numeric, errors='coerce')
+df.replace([np.inf, -np.inf], np.nan, inplace=True)
+df.dropna(inplace=True)
+```
+- What: Loads the Boston Housing dataset and cleans it.
+- Used:
+  - `pd.read_csv`: Reads the CSV file into a Pandas DataFrame.
+  - `pd.to_numeric`: Converts non-numeric values to NaN.
+  - `replace`: Changes infinities to NaN.
+  - `dropna`: Removes rows with NaNs.
+- Purpose: Ensures the dataset is numeric and free of missing/invalid values for modeling.
+- Why: Clean data is required for accurate machine learning.
+
+# 2. Separate Features & Target
+```python
+X = df.drop('medv', axis=1).values
+y = df['medv'].values
+```
+- What: Splits the DataFrame into features (`X`) and target (`y`).
+- Used:
+  - `drop('medv', axis=1)`: Removes the target column (`medv`) to get features.
+  - `.values`: Converts DataFrame/Series to NumPy arrays.
+- Purpose: Prepares input features (e.g., crime rate, rooms) and target (house prices).
+- Why: Machine learning models need separate inputs and outputs.
+
+# 3. Train/Test Split
+```python
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+```
+- What: Splits data into training (80%) and testing (20%) sets.
+- Used:
+  - `train_test_split` (Scikit-learn): Randomly splits `X` and `y`.
+  - `test_size=0.2`: 20% for testing.
+  - `random_state=42`: Ensures reproducible splits.
+- Purpose: Training set trains the model; test set evaluates performance.
+- Why: Prevents overfitting and tests generalization.
+
+# 4. Scale Features
+```python
+scaler_X = StandardScaler()
+X_train_s = scaler_X.fit_transform(X_train)
+X_test_s = scaler_X.transform(X_test)
+```
+- What: Standardizes features to have mean 0 and variance 1.
+- Used:
+  - `StandardScaler` (Scikit-learn): Scales features.
+  - `fit_transform`: Computes mean/variance on training data and scales it.
+  - `transform`: Applies same scaling to test data.
+- Purpose: Normalizes features for better model training.
+- Why: Neural networks perform better with standardized inputs.
+
+# 5. Scale y_train Only
+```python
+scaler_y = StandardScaler()
+y_train_s = scaler_y.fit_transform(y_train.reshape(-1,1))
+```
+- What: Standardizes training target values (`y_train`).
+- Used:
+  - `StandardScaler`: Scales `y_train`.
+  - `reshape(-1,1)`: Converts 1D array to 2D for scaling.
+  - `fit_transform`: Scales training target.
+- Purpose: Normalizes `y_train` for training; `y_test` remains unscaled for metrics.
+- Why: Scaled targets improve model convergence, but unscaled test targets match real-world units.
+
+# 6. Build & Train the DNN
+```python
+model = Sequential([
+    Input(shape=(X_train_s.shape[1],)),
+    Dense(1)
+])
+model.compile(optimizer='adam', loss='mse')
+model.fit(X_train_s, y_train_s, epochs=100, verbose=1)
+```
+- What: Creates and trains a simple neural network (linear regression).
+- Used:
+  - `Sequential` (Keras): Defines a linear model.
+  - `Input`: Sets input size (number of features).
+  - `Dense(1)`: Single neuron (no activation = linear regression).
+  - `compile`: Uses Adam optimizer and mean squared error (MSE) loss.
+  - `fit`: Trains model on scaled `X_train_s` and `y_train_s` for 100 epochs.
+- Purpose: Learns weights to predict house prices.
+- Why: DNN with one neuron mimics linear regression but uses neural network optimization.
+
+# 7. Predict & Inverse-Transform
+```python
+y_pred_s = model.predict(X_test_s)
+y_pred = scaler_y.inverse_transform(y_pred_s).flatten()
+```
+- What: Predicts test set prices and converts back to original scale.
+- Used:
+  - `predict`: Generates scaled predictions (`y_pred_s`).
+  - `inverse_transform`: Converts predictions to original units.
+  - `flatten`: Converts 2D array to 1D.
+- Purpose: Gets predictions in real-world units (e.g., dollars).
+- Why: Scaled predictions must be unscaled for meaningful metrics/plots.
+
+# 8. Print Metrics
+```python
+mse = mean_squared_error(y_test, y_pred)
+mae = mean_absolute_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+print(f"MSE: {mse:.2f}  MAE: {mae:.2f}  R²: {r2:.3f}")
+```
+- What: Computes and prints evaluation metrics.
+- Used:
+  - `mean_squared_error`: Average squared difference between actual and predicted.
+  - `mean_absolute_error`: Average absolute difference.
+  - `r2_score`: Proportion of variance explained (0 to 1).
+- Purpose: Assesses model accuracy.
+- Why: Metrics show how well predictions match actual prices (lower MSE/MAE, higher R² = better).
+
+# 9. Sort for Smooth Plots
+```python
+idx = np.argsort(y_test)
+y_true_sorted = y_test[idx]
+y_pred_sorted = y_pred[idx]
+```
+- What: Sorts test set actual and predicted values by actual prices.
+- Used:
+  - `np.argsort`: Gets indices to sort `y_test`.
+  - Indexing: Applies sorted indices to `y_test` and `y_pred`.
+- Purpose: Ensures smooth line plots by ordering prices.
+- Why: Unsorted plots are jagged; sorted plots show trends clearly.
+
+# 10. Plot Actual Prices
+```python
+plt.figure(figsize=(10, 5))
+plt.plot(y_true_sorted, label='Actual', color='blue', linewidth=2)
+plt.xlabel("Sample Index")
+plt.ylabel("House Price")
+plt.title("Actual Boston Housing Prices")
+plt.legend()
+plt.show()
+```
+- What: Plots sorted actual house prices.
+- Used:
+  - `matplotlib.pyplot`: Creates line plot.
+  - `figure`, `plot`, `xlabel`, `ylabel`, `title`, `legend`, `show`: Configure plot.
+- Purpose: Visualizes actual house prices.
+- Why: Helps understand the range and distribution of true prices.
+
+# 11. Plot Predicted Prices
+```python
+plt.figure(figsize=(10, 5))
+plt.plot(y_pred_sorted, label='Predicted', color='orange', linewidth=2)
+plt.xlabel("Sample Index")
+plt.ylabel("House Price")
+plt.title("Predicted Boston Housing Prices")
+plt.legend()
+plt.show()
+```
+- What: Plots sorted predicted house prices.
+- Used: Same Matplotlib functions as above.
+- Purpose: Visualizes predicted house prices.
+- Why: Allows comparison with actual prices to assess model performance visually.
+
+
+
+ How Parallelism is Achieved
+- No Explicit Parallelism in Code:
+  - The code uses TensorFlow/Keras, which may leverage implicit parallelism via GPU/CPU optimizations (e.g., matrix operations in training).
+  - Scikit-learn’s `StandardScaler` and metrics may use optimized C-based computations.
+  - No OpenMP or explicit multi-threading (unlike previous codes with `#pragma omp`).
+- Potential Parallelism:
+  - TensorFlow’s Adam optimizer and MSE loss computations are vectorized, potentially parallelized by the backend (e.g., TensorFlow’s use of BLAS or GPU).
+  - Training (`model.fit`) may distribute matrix operations across CPU cores or GPU if available.
+- Process:
+  - Matrix multiplications (e.g., Dense layer) are inherently parallelizable.
+  - However, the small dataset (`n = 506`) and simple model (1 neuron) limit parallelism benefits.
+
+
+
+ Benefits of Parallelism vs. Sequential Execution
+- Implicit Parallelism Benefits:
+  - Speedup: TensorFlow’s vectorized operations (e.g., during `fit` or `predict`) are faster than sequential Python loops due to optimized C++ backend and potential multi-core/GPU use.
+  - Scalability: For larger datasets or complex models, TensorFlow scales better by distributing computations.
+- Specific to Code:
+  - Small Dataset (`n = 506`): Limited speedup due to small data and simple model (1 neuron).
+  - Sequential Equivalent: A Python loop for linear regression (e.g., computing sums manually) would be slower without vectorization.
+  - Example: Training 100 epochs on 506 samples is fast (<1s on CPU), but a sequential loop for gradient descent would be slower for large datasets.
+- HPC Context:
+  - TensorFlow’s parallelism is HPC-relevant for large-scale ML (e.g., deep learning on big datasets).
+  - This code’s simplicity limits observable benefits, but the framework supports scalability.
+
+
+
+ Use of Existing Algorithms
+- Algorithm: Linear regression via a neural network.
+  - Model: Single neuron with no activation mimics linear regression (`y = wx + b`).
+  - Training: Uses gradient descent (Adam optimizer) to minimize MSE.
+- Sequential Equivalent: Normal equation or iterative gradient descent in Python.
+- Parallel: TensorFlow’s vectorized operations and potential multi-core/GPU parallelism.
+- Relevance: Linear regression is a standard ML algorithm; DNN framework is HPC-relevant for scalability.
+
+
+
+ Performance Measurement
+- Metrics:
+  - MSE: Measures average squared error (lower is better).
+  - MAE: Measures average absolute error (lower is better).
+  - R²: Measures variance explained (closer to 1 is better).
+  - Example: `MSE: 20.54`, `MAE: 3.20`, `R²: 0.723` (hypothetical, depends on run).
+- No Timing Measurement:
+  - Lacks `time.time()` or similar to measure training/prediction time.
+  - Implicit parallelism (TensorFlow) isn’t quantified.
+- Improvement: Add timing to compare with sequential implementation.
+
+
+
+ Compilation and Execution
+- In Jupyter Notebook:
+  - The code is Python, not C++, so no compilation is needed (ignore `!g++` commands from earlier context).
+  - Run the cell directly in Jupyter after installing dependencies:
+    ```bash
+    pip install pandas numpy matplotlib scikit-learn tensorflow
+    ```
+  - Output: Metrics and two plots (actual vs. predicted prices).
+
+- In Terminal:
+  - Save as `boston_housing.py` (without `%%writefile`).
+  - Run:
+    ```bash
+    python boston_housing.py
+    ```
+
+
+
+ Limitations and Improvements
+- Limitations:
+  - Small dataset (`n = 506`) limits parallelism benefits.
+  - Simple model (1 neuron) doesn’t leverage DNN complexity.
+  - No timing to quantify performance.
+  - Fixed data; no user input.
+- Improvements:
+  - Add timing (`time.time()`) for training/prediction.
+  - Use a deeper DNN for non-linear patterns.
+  - Allow user input for data.
+  - Plot actual vs. predicted in one figure for direct comparison.
+
+
+
+ Relevance to HPC and Deep Learning
+- High Performance Computing:
+  - TensorFlow’s implicit parallelism (vectorization, potential GPU use) aligns with HPC for large-scale ML.
+  - Small dataset limits HPC benefits here.
+- Deep Learning:
+  - Linear regression via DNN is a basic ML task.
+  - Framework scales to complex models (e.g., deep networks) used in real-world ML.
+
+
+
+ Summary
+- Code: Performs linear regression on Boston Housing dataset using a DNN (1 neuron).
+- Parallelism: Implicit via TensorFlow’s vectorized operations, potentially multi-core/GPU.
+- Benefits: Faster than sequential loops for large data; limited for small dataset.
+- Execution: Run in Jupyter or as Python script; no compilation needed.
+- Use: Demonstrates ML workflow (data prep, scaling, modeling, evaluation, visualization).
+
+If you want timing, a deeper model, or comparison with sequential regression, let me know!

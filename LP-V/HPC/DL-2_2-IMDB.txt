@@ -1,0 +1,303 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Embedding, LSTM, Dropout
+from tensorflow.keras.datasets import imdb
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.utils import to_categorical
+
+# Load dataset
+max_features = 1000  # Max number of words to consider as features
+maxlen = 100  # Cut texts after this number of words (among top max_features most common words)
+
+(x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=max_features)
+
+# Preprocessing the data
+x_train = pad_sequences(x_train, maxlen=maxlen)
+x_test = pad_sequences(x_test, maxlen=maxlen)
+
+# Build the model
+model = Sequential([
+    Embedding(input_dim=max_features, output_dim=128, input_length=maxlen),
+    LSTM(128, dropout=0.2, recurrent_dropout=0.2),
+    Dense(1, activation='sigmoid')  # Binary classification (positive/negative)
+])
+
+# Compile the model
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+# Train the model
+history = model.fit(x_train, y_train, epochs=3, batch_size=64, validation_data=(x_test, y_test))
+
+# Evaluate the model
+loss, accuracy = model.evaluate(x_test, y_test)
+print(f'Test Loss: {loss}')
+print(f'Test Accuracy: {accuracy}')
+
+# Predict on some test samples
+num_samples = 5  # Number of samples to predict
+sample_reviews = x_test[:num_samples]
+predictions = model.predict(sample_reviews)
+
+# Show the predictions (0 = Negative, 1 = Positive)
+for i in range(num_samples):
+    print(f'Review {i+1}: {"Positive" if predictions[i] > 0.5 else "Negative"}')
+
+# Optional: Plot training history
+plt.plot(history.history['accuracy'], label='accuracy')
+plt.plot(history.history['val_accuracy'], label = 'val_accuracy')
+plt.title('Model Accuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(loc='lower right')
+plt.show()
+
+
+This Python code implements a Deep Neural Network (DNN) with an LSTM (Long Short-Term Memory) layer for sentiment analysis on the IMDB movie review dataset, classifying reviews as positive or negative. It uses NumPy, Matplotlib, and TensorFlow/Keras. The code is divided into several blocks, each explained below in simple language, covering what is used, its purpose, parallelism, and benefits over sequential execution.
+
+
+
+ Block-by-Block Explanation
+
+# 1. Import Libraries
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Embedding, LSTM, Dropout
+from tensorflow.keras.datasets import imdb
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.utils import to_categorical
+```
+- What: Imports required libraries.
+- Used:
+  - `numpy`: For array operations.
+  - `matplotlib.pyplot`: For plotting.
+  - `tensorflow.keras`: For building and training the DNN.
+    - `Sequential`: Linear model.
+    - `Dense`, `Embedding`, `LSTM`, `Dropout`: Neural network layers.
+    - `imdb`: IMDB dataset.
+    - `pad_sequences`: Preprocesses text sequences.
+    - `to_categorical`: Not used here (likely included by mistake).
+- Purpose: Provides tools for data processing, modeling, and visualization.
+- Why: Essential for ML workflow (data prep, model training, evaluation).
+
+# 2. Load Dataset
+```python
+max_features = 1000
+maxlen = 100
+(x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=max_features)
+```
+- What: Loads the IMDB dataset with 25,000 training and 25,000 test reviews.
+- Used:
+  - `imdb.load_data`: Loads reviews, keeping only the top 1000 words (`max_features`).
+  - `num_words=max_features`: Limits vocabulary to 1000 most frequent words.
+  - `x_train`, `x_test`: Lists of word index sequences (integers).
+  - `y_train`, `y_test`: Labels (0 = negative, 1 = positive).
+- Purpose: Prepares text data for sentiment classification.
+- Why: IMDB dataset is standard for binary text classification.
+
+# 3. Preprocess Data
+```python
+x_train = pad_sequences(x_train, maxlen=maxlen)
+x_test = pad_sequences(x_test, maxlen=maxlen)
+```
+- What: Pads/truncates reviews to a fixed length (100 words).
+- Used:
+  - `pad_sequences`: Ensures all sequences have length `maxlen=100`.
+    - Pads short reviews with zeros.
+    - Truncates long reviews.
+- Purpose: Uniform input size for the neural network.
+- Why: LSTM requires fixed-length inputs for processing.
+
+# 4. Build the Model
+```python
+model = Sequential([
+    Embedding(input_dim=max_features, output_dim=128, input_length=maxlen),
+    LSTM(128, dropout=0.2, recurrent_dropout=0.2),
+    Dense(1, activation='sigmoid')
+])
+```
+- What: Creates a DNN for sentiment classification.
+- Used:
+  - `Sequential`: Defines a linear model.
+  - `Embedding`: Converts word indices to 128-dimensional vectors (1000 words → 128D).
+  - `LSTM`: 128-unit LSTM layer processes sequences, with 20% dropout to prevent overfitting.
+  - `Dense`: Single neuron with sigmoid activation for binary output (0-1 probability).
+- Purpose: Learns to classify reviews as positive/negative.
+- Why: Embedding + LSTM captures word relationships and sequence patterns; sigmoid outputs probabilities.
+
+# 5. Compile the Model
+```python
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+```
+- What: Configures the model for training.
+- Used:
+  - `compile`:
+    - `loss='binary_crossentropy'`: Loss function for binary classification.
+    - `optimizer='adam'`: Adam optimizer for gradient descent.
+    - `metrics=['accuracy']`: Tracks accuracy during training.
+- Purpose: Sets up how the model learns and evaluates.
+- Why: Binary crossentropy is standard for binary classification; Adam is efficient.
+
+# 6. Train the Model
+```python
+history = model.fit(x_train, y_train, epochs=3, batch_size=64, validation_data=(x_test, y_test))
+```
+- What: Trains the model on training data.
+- Used:
+  - `fit`:
+    - Trains on `x_train`, `y_train` for 3 epochs.
+    - `batch_size=64`: Processes 64 reviews per batch.
+    - `validation_data`: Evaluates on test set each epoch.
+  - `history`: Stores training/validation loss and accuracy.
+- Purpose: Adjusts model weights to minimize loss.
+- Why: Training learns patterns; validation monitors generalization.
+
+# 7. Evaluate the Model
+```python
+loss, accuracy = model.evaluate(x_test, y_test)
+print(f'Test Loss: {loss}')
+print(f'Test Accuracy: {accuracy}')
+```
+- What: Tests model performance on test set.
+- Used:
+  - `evaluate`: Computes loss and accuracy on `x_test`, `y_test`.
+  - `print`: Displays results (e.g., `Test Loss: 0.35`, `Test Accuracy: 0.85`).
+- Purpose: Measures how well the model predicts unseen reviews.
+- Why: Quantifies model quality (high accuracy = good performance).
+
+# 8. Predict on Test Samples
+```python
+num_samples = 5
+sample_reviews = x_test[:num_samples]
+predictions = model.predict(sample_reviews)
+for i in range(num_samples):
+    print(f'Review {i+1}: {"Positive" if predictions[i] > 0.5 else "Negative"}')
+```
+- What: Predicts sentiment for 5 test reviews.
+- Used:
+  - `predict`: Outputs probabilities for `sample_reviews`.
+  - Threshold (`> 0.5`): Classifies as Positive (1) or Negative (0).
+  - `print`: Shows predictions (e.g., `Review 1: Positive`).
+- Purpose: Demonstrates model predictions on specific examples.
+- Why: Shows practical use of the model.
+
+# 9. Plot Training History
+```python
+plt.plot(history.history['accuracy'], label='accuracy')
+plt.plot(history.history['val_accuracy'], label = 'val_accuracy')
+plt.title('Model Accuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(loc='lower right')
+plt.show()
+```
+- What: Plots training and validation accuracy over epochs.
+- Used:
+  - `matplotlib.pyplot`: Creates line plot.
+  - `history.history`: Accesses accuracy data.
+  - `plot`, `title`, `ylabel`, `xlabel`, `legend`, `show`: Configures plot.
+- Purpose: Visualizes model performance trends.
+- Why: Helps identify convergence or overfitting (e.g., diverging train/validation accuracy).
+
+
+
+ How Parallelism is Achieved
+- No Explicit Parallelism:
+  - Uses TensorFlow/Keras, which employs implicit parallelism via:
+    - Vectorization: Matrix operations (e.g., Embedding, LSTM, Dense) are optimized in C++.
+    - Backend: TensorFlow may use multi-core CPU or GPU for computations (e.g., matrix multiplications, LSTM gates).
+  - No OpenMP or explicit multi-threading (unlike previous codes).
+- Mechanism:
+  - Training (`model.fit`): Batch processing (64 reviews) and gradient updates are parallelized by TensorFlow (e.g., BLAS for matrix ops).
+  - Prediction (`model.predict`): Forward passes are vectorized, potentially multi-core/GPU.
+  - LSTM: Recurrent computations are optimized for parallelism within batches.
+- Dataset Size: 25,000 training samples, 100-word sequences; parallelism benefits are significant due to large data and complex model.
+
+
+
+ Benefits of Parallelism vs. Sequential Execution
+- Implicit Parallelism Benefits:
+  - Speedup: TensorFlow’s vectorized operations are much faster than sequential Python loops for LSTM and matrix computations.
+  - Scalability: Scales to larger datasets/models, leveraging CPU/GPU cores.
+  - Example: Training 3 epochs on 25,000 samples takes ~1-2 minutes on CPU; a sequential Python loop for LSTM would take hours.
+- Specific to Code:
+  - Large Dataset (25,000 samples): Parallelism speeds up training/prediction, especially for LSTM’s recurrent computations.
+  - Sequential Equivalent: Manual Python loops for forward/backward passes would be impractical for 25,000 sequences.
+  - HPC Context: TensorFlow’s parallelism is HPC-relevant for large-scale deep learning (e.g., NLP, image processing).
+- Quantitative:
+  - Training might take ~1 min/epoch on CPU; sequential implementation could take 10x longer.
+
+
+
+ Use of Existing Algorithms
+- Algorithm: Binary classification via LSTM-based DNN.
+  - Model: Embedding + LSTM + Dense for sequence classification.
+  - Training: Gradient descent with Adam optimizer, binary crossentropy loss.
+- Sequential Equivalent: Manual RNN or simpler classifiers (e.g., logistic regression).
+- Parallel: TensorFlow’s vectorized operations and potential multi-core/GPU parallelism.
+- Relevance: LSTM is standard for sequence modeling (e.g., NLP); parallelism is HPC-relevant.
+
+
+
+ Performance Measurement
+- Metrics:
+  - Accuracy: Reported during training and evaluation (e.g., `Test Accuracy: 0.85`).
+  - Loss: Binary crossentropy (lower is better).
+  - Plot: Visualizes train/validation accuracy to assess convergence/overfitting.
+- No Timing Measurement:
+  - Lacks `time.time()` to measure training/prediction time.
+  - Implicit parallelism isn’t quantified.
+- Improvement: Add timing to compare with sequential implementation.
+
+
+
+ Execution
+- In Jupyter Notebook:
+  - Run the code after installing dependencies:
+    ```bash
+    pip install numpy matplotlib tensorflow
+    ```
+  - Output: Test loss/accuracy, 5 sample predictions, and accuracy plot.
+- In Terminal:
+  - Save as `imdb_sentiment.py`.
+  - Run:
+    ```bash
+    python imdb_sentiment.py
+    ```
+
+
+
+ Limitations and Improvements
+- Limitations:
+  - Large dataset (25,000 samples) benefits parallelism, but only 3 epochs limit training.
+  - No timing to quantify performance.
+  - Fixed hyperparameters (e.g., 128 LSTM units, 0.2 dropout).
+  - No detailed evaluation (e.g., precision/recall).
+- Improvements:
+  - Add `time.time()` for timing.
+  - Increase epochs or tune hyperparameters.
+  - Add classification report for detailed metrics.
+  - Use bidirectional LSTM for better performance.
+
+
+
+ Relevance to HPC and Deep Learning
+- High Performance Computing:
+  - TensorFlow’s implicit parallelism (vectorization, CPU/GPU) aligns with HPC for large-scale ML.
+  - Large dataset leverages parallelism effectively.
+- Deep Learning:
+  - LSTM for sentiment analysis is a standard NLP task.
+  - Framework scales to complex tasks (e.g., text generation, translation).
+
+
+
+ Summary
+- Code: Classifies IMDB reviews as positive/negative using an LSTM-based DNN.
+- Parallelism: Implicit via TensorFlow’s vectorized operations, potentially multi-core/GPU.
+- Benefits: Faster than sequential loops for large data; significant for 25,000 samples.
+- Execution: Run in Jupyter or as Python script; no compilation needed.
+- Use: Demonstrates NLP workflow (preprocessing, LSTM training, evaluation, visualization).
+
+If you want timing, hyperparameter tuning, or additional metrics, let me know!

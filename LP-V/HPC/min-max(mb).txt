@@ -1,0 +1,201 @@
+#include <iostream> 
+#include <vector> 
+#include <omp.h> 
+#include <climits> 
+using namespace std; 
+void min_reduction(vector<int>& arr) { 
+int min_value = INT_MAX; 
+#pragma omp parallel for reduction(min: min_value) 
+for (int i = 0; i < arr.size(); i++) { 
+if (arr[i] < min_value) { 
+min_value = arr[i]; 
+} 
+} 
+cout << "Minimum value: " << min_value << endl; 
+} 
+void max_reduction(vector<int>& arr) { 
+int max_value = INT_MIN; 
+#pragma omp parallel for reduction(max: max_value) 
+for (int i = 0; i < arr.size(); i++) { 
+if (arr[i] > max_value) { 
+max_value = arr[i]; 
+} 
+} 
+cout << "Maximum value: " << max_value << endl; 
+} 
+void sum_reduction(vector<int>& arr) { 
+int sum = 0; 
+#pragma omp parallel for reduction(+: sum) 
+for (int i = 0; i < arr.size(); i++) { 
+sum += arr[i]; 
+} 
+cout << "Sum: " << sum << endl; 
+} 
+void average_reduction(vector<int>& arr) { 
+int sum = 0; 
+#pragma omp parallel for reduction(+: sum) 
+for (int i = 0; i < arr.size(); i++) { 
+sum += arr[i]; 
+} 
+cout << "Average: " << (double)sum / arr.size() << endl; 
+} 
+int main() { 
+vector<int> arr = {5, 2, 9, 1, 7, 6, 8, 3, 4}; 
+min_reduction(arr); 
+max_reduction(arr); 
+sum_reduction(arr); 
+average_reduction(arr); 
+}
+
+
+The code implements Min, Max, Sum, and Average operations using parallel reduction with OpenMP, which is relevant to high performance computing. Here's a step-by-step explanation:
+
+Problem Relevance: The task requires implementing parallel reduction for Min, Max, Sum, and Average, which aligns with high performance computing by leveraging parallelism to optimize performance on large datasets.
+Code Structure:
+The code uses a vector<int> as input and OpenMP for parallelism.
+Each operation (Min, Max, Sum, Average) is implemented as a separate function.
+Min Reduction:
+Uses #pragma omp parallel for reduction(min: min_value) to parallelize the loop.
+Each thread compares elements with min_value, updating it if a smaller value is found.
+The reduction clause ensures thread-safe updates to min_value.
+Max Reduction:
+Similar to Min, but uses reduction(max: max_value) to find the largest value.
+Threads update max_value if a larger element is encountered.
+Sum Reduction:
+Uses reduction(+: sum) to parallelize the summation.
+Each thread adds elements to a local sum, and OpenMP combines them into the final sum.
+Average Reduction:
+Reuses the Sum reduction logic to compute the total sum.
+Divides the sum by the array size to calculate the average.
+Main Function:
+Initializes a sample vector {5, 2, 9, 1, 7, 6, 8, 3, 4}.
+Calls each reduction function to compute and print results.
+Relevance to HPC:
+The use of OpenMP for parallel reduction demonstrates efficient parallel processing, a core concept in high performance computing.
+The code is not directly related to deep learning but is highly relevant to HPC for optimizing computations on large datasets.
+
+SIMPLE
+#include <iostream>
+#include <vector>
+#include <omp.h>
+#include <climits>
+using namespace std;
+
+// Performs Min, Max, Sum, and Average using parallel reduction
+void parallel_reduction(const vector<int>& arr) {
+    int min_value = INT_MAX;
+    int max_value = INT_MIN;
+    long long sum = 0; // Using long long to prevent overflow for large arrays
+    int n = arr.size();
+
+    // Single parallel loop for all reductions
+    #pragma omp parallel for reduction(min: min_value) reduction(max: max_value) reduction(+: sum)
+    for (int i = 0; i < n; i++) {
+        if (arr[i] < min_value) min_value = arr[i]; // Update min
+        if (arr[i] > max_value) max_value = arr[i]; // Update max
+        sum += arr[i]; // Accumulate sum
+    }
+
+    // Output results
+    cout << "Minimum value: " << min_value << endl;
+    cout << "Maximum value: " << max_value << endl;
+    cout << "Sum: " << sum << endl;
+    cout << "Average: " << (double)sum / n << endl;
+}
+
+int main() {
+    // Initialize sample array
+    vector<int> arr = {5, 2, 9, 1, 7, 6, 8, 3, 4};
+    
+    // Perform all reductions
+    parallel_reduction(arr);
+    return 0;
+}
+
+The simplified code computes Min, Max, Sum, and Average of a vector using parallel reduction with OpenMP in a single function to reduce redundancy. It takes a vector of integers, processes it in parallel, and outputs the results.
+
+Input: A vector<int> (e.g., {5, 2, 9, 1, 7, 6, 8, 3, 4}).
+Function: parallel_reduction performs all operations in one loop.
+Variables:
+min_value: Tracks the minimum (initialized to INT_MAX).
+max_value: Tracks the maximum (initialized to INT_MIN).
+sum: Accumulates the sum (uses long long to prevent overflow).
+n: Stores array size for average calculation.
+Output: Prints Min, Max, Sum, and Average.
+How Parallelism is Achieved
+The code uses OpenMP to implement parallelism via parallel reduction:
+
+OpenMP Directive:
+#pragma omp parallel for reduction(min: min_value) reduction(max: max_value) reduction(+: sum):
+parallel for: Splits the loop iterations across multiple threads, enabling parallel execution.
+reduction: Specifies thread-safe operations for min_value (minimum), max_value (maximum), and sum (addition).
+Reduction Mechanism:
+Each thread processes a subset of the array, maintaining local copies of min_value, max_value, and sum.
+For each element, threads:
+Compare with min_value to update the local minimum.
+Compare with max_value to update the local maximum.
+Add to the local sum.
+After the loop, OpenMP combines local results:
+Takes the smallest min_value across threads.
+Takes the largest max_value across threads.
+Adds all local sum values to get the global sum.
+Efficiency:
+Single parallel loop minimizes overhead compared to separate loops for each operation.
+Parallelism scales with the number of CPU cores, speeding up computation for large arrays.
+Why It’s Relevant
+High Performance Computing: The use of OpenMP for parallel reduction optimizes performance by distributing work across threads, a key HPC technique.
+Simplicity: Combining operations in one loop reduces code duplication while maintaining clarity and functionality.
+
+
+USER INPUT
+#include <iostream>
+#include <vector>
+#include <omp.h>
+#include <climits>
+using namespace std;
+
+// Performs Min, Max, Sum, and Average using parallel reduction
+void parallel_reduction(const vector<int>& arr) {
+    int min_value = INT_MAX;
+    int max_value = INT_MIN;
+    long long sum = 0; // Using long long to prevent overflow
+    int n = arr.size();
+
+    // Single parallel loop for all reductions
+    #pragma omp parallel for reduction(min: min_value) reduction(max: max_value) reduction(+: sum)
+    for (int i = 0; i < n; i++) {
+        if (arr[i] < min_value) min_value = arr[i]; // Update min
+        if (arr[i] > max_value) max_value = arr[i]; // Update max
+        sum += arr[i]; // Accumulate sum
+    }
+
+    // Output results
+    cout << "Minimum value: " << min_value << endl;
+    cout << "Maximum value: " << max_value << endl;
+    cout << "Sum: " << sum << endl;
+    cout << "Average: " << (double)sum / n << endl;
+}
+
+int main() {
+    int n;
+    // Prompt user for array size
+    cout << "Enter the number of elements: ";
+    cin >> n;
+    
+    // Input validation for array size
+    if (n <= 0) {
+        cout << "Invalid input. Size must be positive." << endl;
+        return 1;
+    }
+
+    vector<int> arr(n);
+    // Prompt user for array elements
+    cout << "Enter " << n << " integers:" << endl;
+    for (int i = 0; i < n; i++) {
+        cin >> arr[i];
+    }
+
+    // Perform all reductions
+    parallel_reduction(arr);
+    return 0;
+}

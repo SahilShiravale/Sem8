@@ -1,0 +1,298 @@
+g++ -fopenmp Parallel_DFS.cpp -o Parallel_DFS
+g++ -fopenmp Parallel_DFS.cpp -o Parallel_DFS
+./Parallel_DFS
+
+DFS
+#include <iostream>
+#include <vector>
+#include <omp.h>
+using namespace std;
+
+// Sequential DFS: Recursively explores nodes
+void sequential_dfs(const vector<vector<int>>& adj, vector<bool>& visited, int node) {
+    visited[node] = true;
+    cout << node << " ";
+    for (int neighbor : adj[node]) {
+        if (!visited[neighbor]) {
+            sequential_dfs(adj, visited, neighbor);
+        }
+    }
+}
+
+// Parallel DFS: Uses tasks for independent subtrees
+void parallel_dfs(const vector<vector<int>>& adj, vector<bool>& visited, int node) {
+    visited[node] = true;
+    cout << node << " ";
+    #pragma omp parallel
+    #pragma omp single
+    for (int neighbor : adj[node]) {
+        if (!visited[neighbor]) {
+            #pragma omp task
+            parallel_dfs(adj, visited, neighbor);
+        }
+    }
+}
+
+// Print visited nodes for verification
+void print_visited(const vector<bool>& visited, int n) {
+    cout << "Visited nodes: ";
+    for (int i = 1; i <= n; i++) {
+        if (visited[i]) cout << i << " ";
+    }
+    cout << endl;
+}
+
+int main() {
+    int n, m, start_node;
+    // Input number of nodes and edges
+    cout << "Enter number of nodes and edges: ";
+    cin >> n >> m;
+    if (n <= 0 || m < 0) {
+        cout << "Invalid input." << endl;
+        return 1;
+    }
+
+    // Initialize adjacency list
+    vector<vector<int>> adj(n + 1);
+    cout << "Enter " << m << " edges (u v): ";
+    for (int i = 0; i < m; i++) {
+        int u, v;
+        cin >> u >> v;
+        adj[u].push_back(v);
+        adj[v].push_back(u); // Undirected graph
+    }
+
+    // Input start node
+    cout << "Enter start node: ";
+    cin >> start_node;
+    if (start_node < 1 || start_node > n) {
+        cout << "Invalid start node." << endl;
+        return 1;
+    }
+
+    double start, end;
+    vector<bool> visited;
+
+    // Sequential DFS
+    visited.assign(n + 1, false);
+    cout << "Sequential DFS: ";
+    start = omp_get_wtime();
+    sequential_dfs(adj, visited, start_node);
+    end = omp_get_wtime();
+    cout << "\nTime: " << end - start << "s\n";
+    print_visited(visited, n);
+
+    // Parallel DFS
+    visited.assign(n + 1, false);
+    cout << "\nParallel DFS: ";
+    start = omp_get_wtime();
+    parallel_dfs(adj, visited, start_node);
+    end = omp_get_wtime();
+    cout << "\nTime: " << end - start << "s\n";
+    print_visited(visited, n);
+
+    return 0;
+}
+Explanation
+Purpose: Performs sequential and parallel DFS on an undirected graph, measures execution time.
+Sequential DFS:
+Recursively visits a node, marks it visited, prints it, and explores unvisited neighbors.
+Parallel DFS:
+Marks and prints the current node.
+Uses OpenMP tasks to parallelize exploration of unvisited neighbors (subtrees).
+Input: Number of nodes (n), edges (m), edge pairs (u, v), and start node.
+Output: Prints DFS traversal order and visited nodes, with execution times.
+Graph: Adjacency list for undirected graph (edges added bidirectionally).
+Parallelism
+Mechanism: #pragma omp task, #pragma omp parallel, #pragma omp single.
+How: Creates tasks for recursive DFS on unvisited neighbors, executed by threads.
+Thread Safety: visited array updates are safe (each node marked once by the first thread).
+Benefit: Parallelizes independent subtrees, speeding up large, branched graphs.
+Simplicity
+Why Simple: Clear functions for sequential/parallel DFS, validated user input, minimal code, prints results for verification.
+Improvements from Original:
+Fixes incorrect parallelism (original used #pragma omp parallel for, causing race conditions).
+Adds sequential DFS and performance measurement.
+Uses dynamic adjacency list (no fixed MAXN).
+Performance Measurement
+Sequential: Standard recursive DFS, timed with omp_get_wtime().
+Parallel: Task-based DFS, timed similarly.
+How: Records start and end times, prints end - start in seconds.
+Comparison: Same graph used for both; times show speedup for large graphs (sequential may be faster for small graphs due to task overhead).
+
+BFS
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <omp.h>
+using namespace std;
+
+// Sequential BFS: Explores nodes level by level
+void sequential_bfs(const vector<vector<int>>& adj, vector<bool>& visited, int source) {
+    queue<int> q;
+    visited[source] = true;
+    q.push(source);
+    while (!q.empty()) {
+        int node = q.front();
+        q.pop();
+        cout << node << " ";
+        for (int neighbor : adj[node]) {
+            if (!visited[neighbor]) {
+                visited[neighbor] = true;
+                q.push(neighbor);
+            }
+        }
+    }
+}
+
+// Parallel BFS: Level-synchronized exploration
+void parallel_bfs(const vector<vector<int>>& adj, vector<bool>& visited, int source) {
+    vector<int> current_level, next_level;
+    visited[source] = true;
+    current_level.push_back(source);
+    while (!current_level.empty()) {
+        // Print current level nodes
+        for (int node : current_level) {
+            cout << node << " ";
+        }
+        next_level.clear();
+        // Parallel processing of neighbors
+        #pragma omp parallel
+        {
+            vector<int> local_next; // Thread-local storage
+            #pragma omp for schedule(dynamic) nowait
+            for (size_t i = 0; i < current_level.size(); i++) {
+                int node = current_level[i];
+                for (int neighbor : adj[node]) {
+                    #pragma omp critical
+                    {
+                        if (!visited[neighbor]) {
+                            visited[neighbor] = true;
+                            local_next.push_back(neighbor);
+                        }
+                    }
+                }
+            }
+            // Combine thread-local results
+            #pragma omp critical
+            next_level.insert(next_level.end(), local_next.begin(), local_next.end());
+        }
+        current_level = next_level; // Move to next level
+    }
+}
+
+// Print visited nodes for verification
+void print_visited(const vector<bool>& visited, int n) {
+    cout << "Visited nodes: ";
+    for (int i = 1; i <= n; i++) {
+        if (visited[i]) cout << i << " ";
+    }
+    cout << endl;
+}
+
+int main() {
+    int n, m, source;
+    // Input number of nodes and edges
+    cout << "Enter number of nodes and edges: ";
+    cin >> n >> m;
+    if (n <= 0 || m < 0) {
+        cout << "Invalid input." << endl;
+        return 1;
+    }
+
+    // Initialize adjacency list
+    vector<vector<int>> adj(n + 1);
+    cout << "Enter " << m << " edges (u v): ";
+    for (int i = 0; i < m; i++) {
+        int u, v;
+        cin >> u >> v;
+        adj[u].push_back(v);
+        adj[v].push_back(u); // Undirected graph
+    }
+
+    // Input source node
+    cout << "Enter source node: ";
+    cin >> source;
+    if (source < 1 || source > n) {
+        cout << "Invalid source node." << endl;
+        return 1;
+    }
+
+    double start, end;
+    vector<bool> visited;
+
+    // Sequential BFS
+    visited.assign(n + 1, false);
+    cout << "Sequential BFS: ";
+    start = omp_get_wtime();
+    sequential_bfs(adj, visited, source);
+    end = omp_get_wtime();
+    cout << "\nTime: " << end - start << "s\n";
+    print_visited(visited, n);
+
+    // Parallel BFS
+    visited.assign(n + 1, false);
+    cout << "\nParallel BFS: ";
+    start = omp_get_wtime();
+    parallel_bfs(adj, visited, source);
+    end = omp_get_wtime();
+    cout << "\nTime: " << end - start << "s\n";
+    print_visited(visited, n);
+
+    return 0;
+}
+
+Explanation
+Purpose: Performs sequential and parallel BFS on an undirected graph, measures execution time.
+Sequential BFS:
+Uses a queue to visit nodes level by level.
+Marks, prints, and enqueues unvisited neighbors.
+Parallel BFS:
+Processes nodes level by level using vectors (current_level, next_level).
+Parallelizes neighbor exploration for all nodes in a level.
+Input: Number of nodes (n), edges (m), edge pairs (u, v), and source node.
+Output: Prints BFS traversal order and visited nodes, with execution times.
+Graph: Adjacency list for undirected graph.
+Parallelism
+Mechanism: #pragma omp parallel, #pragma omp for, #pragma omp critical.
+How: Threads process nodes in the current level concurrently, checking neighbors.
+Thread Safety:
+#pragma omp critical ensures safe updates to visited and next_level.
+Thread-local local_next vectors avoid conflicts, merged later.
+Benefit: Parallelizes neighbor checks per level, faster for large graphs.
+Simplicity
+Why Simple: Clear functions for sequential/parallel BFS, validated input, minimal code, prints results.
+Improvements from Original:
+Fixes race conditions (original parallel loop accessed shared queue unsafely).
+Uses level-synchronized BFS for correct parallelism.
+Adds sequential BFS and performance measurement.
+Performance Measurement
+Sequential: Standard queue-based BFS, timed with omp_get_wtime().
+Parallel: Level-synchronized BFS, timed similarly.
+How: Records start and end times, prints end - start in seconds.
+Comparison: Same graph used; times show speedup for large graphs (sequential may be faster for small graphs due to synchronization overhead).
+Use of Existing Algorithms
+DFS:
+Sequential: Classic recursive DFS.
+Parallel: Task-based DFS, a standard parallel variant for graphs/trees.
+BFS:
+Sequential: Classic queue-based BFS.
+Parallel: Level-synchronized BFS, a known parallel approach.
+Both are based on standard graph traversal algorithms, adapted for OpenMP.
+Measuring Performance
+Sequential vs. Parallel:
+Sequential: Standard DFS/BFS without OpenMP.
+Parallel: Uses tasks (DFS) or level-parallelism (BFS).
+How:
+omp_get_wtime() measures time before (start) and after (end).
+Prints end - start in seconds.
+Comparison:
+Same graph for both versions.
+Outputs traversal order and times for analysis.
+Scalability:
+Small graphs: Sequential may be faster due to parallel overhead.
+Large graphs: Parallel versions should show speedup, especially for BFS.
+Relevance to HPC
+High Performance Computing: OpenMP parallelizes graph traversals, optimizing for multi-core CPUs, a key HPC technique.
+Performance Analysis: Sequential vs. parallel times show efficiency, critical for large graphs.
+Deep Learning: Not directly related, but graph traversals are used in graph neural networks or data preprocessing

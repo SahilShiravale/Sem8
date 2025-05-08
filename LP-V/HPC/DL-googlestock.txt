@@ -1,0 +1,279 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from keras.models import Sequential
+from keras.layers import SimpleRNN, Dense
+
+# Load and preprocess dataset
+df = pd.read_csv('/content/Google_Stock_Price_Train.csv')
+df['Close'] = df['Close'].str.replace(',', '').astype(float)
+data = df['Close'].values.reshape(-1, 1)
+
+# Normalize
+scaler = MinMaxScaler()
+scaled_data = scaler.fit_transform(data)
+
+# Create sequences
+def create_dataset(data, step=60):
+    X = np.array([data[i-step:i, 0] for i in range(step, len(data))])
+    y = data[step:, 0]
+    return X, y
+
+X, y = create_dataset(scaled_data)
+X = X[..., np.newaxis]  # Add third dimension for RNN input
+
+# Build RNN model
+model = Sequential([
+    SimpleRNN(50, input_shape=(X.shape[1], 1)),
+    Dense(1)
+])
+model.compile(optimizer='adam', loss='mean_squared_error')
+
+# Train
+model.fit(X, y, epochs=5, batch_size=32)
+
+# Predict
+predicted = model.predict(X)
+predicted_prices = scaler.inverse_transform(predicted)
+real_prices = scaler.inverse_transform(y.reshape(-1, 1))
+
+# Plot
+plt.plot(real_prices, label='Real')
+plt.plot(predicted_prices, label='Predicted')
+plt.legend()
+plt.show()
+
+
+This Python code implements a Simple Recurrent Neural Network (RNN) to predict Google stock prices using historical closing prices from a dataset. It uses NumPy, Pandas, Matplotlib, Scikit-learn, and Keras. The code is divided into several blocks, each explained below in simple language, covering what is used, its purpose, parallelism, and benefits over sequential execution.
+
+
+
+ Block-by-Block Explanation
+
+# 1. Import Libraries
+```python
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from keras.models import Sequential
+from keras.layers import SimpleRNN, Dense
+```
+- What: Imports required libraries.
+- Used:
+  - `numpy`: For array operations.
+  - `pandas`: For data loading/processing.
+  - `matplotlib.pyplot`: For plotting.
+  - `sklearn.preprocessing.MinMaxScaler`: For data normalization.
+  - `keras`: For building RNN.
+    - `Sequential`: Linear model.
+    - `SimpleRNN`, `Dense`: RNN and output layers.
+- Purpose: Provides tools for data handling, modeling, and visualization.
+- Why: Essential for time-series prediction workflow.
+
+# 2. Load and Preprocess Dataset
+```python
+df = pd.read_csv('/content/Google_Stock_Price_Train.csv')
+df['Close'] = df['Close'].str.replace(',', '').astype(float)
+data = df['Close'].values.reshape(-1, 1)
+```
+- What: Loads Google stock price data and prepares closing prices.
+- Used:
+  - `pd.read_csv`: Reads CSV into a DataFrame.
+  - `str.replace(',', '')`: Removes commas from `Close` column.
+  - `astype(float)`: Converts prices to floats.
+  - `values.reshape(-1, 1)`: Extracts `Close` as a 2D NumPy array.
+- Purpose: Prepares numerical closing prices for modeling.
+- Why: RNN requires clean, numerical data.
+
+# 3. Normalize Data
+```python
+scaler = MinMaxScaler()
+scaled_data = scaler.fit_transform(data)
+```
+- What: Scales closing prices to range [0, 1].
+- Used:
+  - `MinMaxScaler`: Normalizes data.
+  - `fit_transform`: Computes min/max and scales data.
+- Purpose: Normalizes prices for better RNN training.
+- Why: RNNs perform better with scaled inputs.
+
+# 4. Create Sequences
+```python
+def create_dataset(data, step=60):
+    X = np.array([data[i-step:i, 0] for i in range(step, len(data))])
+    y = data[step:, 0]
+    return X, y
+X, y = create_dataset(scaled_data)
+X = X[..., np.newaxis]
+```
+- What: Creates input-output pairs for time-series prediction.
+- Used:
+  - `create_dataset`: Custom function:
+    - `X`: Arrays of 60 previous prices (timesteps).
+    - `y`: Next price after each sequence.
+  - `np.array`: Converts lists to arrays.
+  - `np.newaxis`: Adds a third dimension to `X` (shape: samples, 60, 1).
+- Purpose: Prepares sequences for RNN (predict next price from 60 prior prices).
+- Why: RNNs need sequential data with fixed timesteps.
+
+# 5. Build RNN Model
+```python
+model = Sequential([
+    SimpleRNN(50, input_shape=(X.shape[1], 1)),
+    Dense(1)
+])
+model.compile(optimizer='adam', loss='mean_squared_error')
+```
+- What: Creates a simple RNN model.
+- Used:
+  - `Sequential`: Defines linear model.
+  - `SimpleRNN`: 50-unit RNN layer to process sequences.
+  - `input_shape=(60, 1)`: 60 timesteps, 1 feature (price).
+  - `Dense(1)`: Outputs single predicted price.
+  - `compile`: Uses Adam optimizer and mean squared error (MSE) loss.
+- Purpose: Learns to predict next stock price.
+- Why: SimpleRNN is suitable for basic time-series tasks; MSE measures prediction error.
+
+# 6. Train Model
+```python
+model.fit(X, y, epochs=5, batch_size=32)
+```
+- What: Trains the RNN on sequence data.
+- Used:
+  - `fit`:
+    - Trains on `X` (sequences), `y` (next prices).
+    - `epochs=5`: 5 passes over data.
+    - `batch_size=32`: Processes 32 sequences per batch.
+- Purpose: Adjusts model weights to minimize prediction error.
+- Why: Training learns temporal patterns in stock prices.
+
+# 7. Predict
+```python
+predicted = model.predict(X)
+predicted_prices = scaler.inverse_transform(predicted)
+real_prices = scaler.inverse_transform(y.reshape(-1, 1))
+```
+- What: Predicts prices and converts back to original scale.
+- Used:
+  - `predict`: Generates scaled predictions.
+  - `inverse_transform`: Converts predictions and actual prices to original units.
+  - `reshape(-1, 1)`: Ensures `y` is 2D for scaling.
+- Purpose: Gets predictions in real-world units (e.g., dollars).
+- Why: Scaled predictions must be unscaled for comparison.
+
+# 8. Plot Results
+```python
+plt.plot(real_prices, label='Real')
+plt.plot(predicted_prices, label='Predicted')
+plt.legend()
+plt.show()
+```
+- What: Plots real vs. predicted stock prices.
+- Used:
+  - `matplotlib.pyplot`: Creates line plot.
+  - `plot`, `legend`, `show`: Plots real/predicted prices with labels.
+- Purpose: Visualizes model performance.
+- Why: Shows how well predictions match actual prices.
+
+
+
+ How Parallelism is Achieved
+- No Explicit Parallelism:
+  - Uses Keras (TensorFlow backend), which employs implicit parallelism:
+    - Vectorization: Matrix operations (e.g., RNN, Dense) are optimized in C++.
+    - Backend: TensorFlow may use multi-core CPU or GPU for computations (e.g., RNN weight updates).
+  - Scikit-learn’s `MinMaxScaler` uses optimized C-based computations.
+  - No OpenMP or explicit multi-threading.
+- Mechanism:
+  - Training (`model.fit`): Batch processing (32 sequences) and gradient updates are parallelized by TensorFlow (e.g., BLAS for matrix ops).
+  - Prediction (`model.predict`): Forward passes are vectorized, potentially multi-core.
+  - RNN: Recurrent computations are optimized within batches.
+- Dataset Size: ~1200 samples (assuming typical Google stock data, e.g., 1258 rows); parallelism benefits are moderate due to small size.
+
+
+
+ Benefits of Parallelism vs. Sequential Execution
+- Implicit Parallelism Benefits:
+  - Speedup: TensorFlow’s vectorized operations are faster than sequential Python loops for RNN computations.
+  - Scalability: Scales to larger datasets or complex models, leveraging CPU/GPU.
+  - Example: Training 5 epochs on ~1200 samples takes ~10-20s on CPU; sequential Python RNN would take minutes.
+- Specific to Code:
+  - Moderate Dataset (~1200 samples): Parallelism speeds up training/prediction, but benefits are limited by small size and simple model (50-unit RNN).
+  - Sequential Equivalent: Manual Python loop for RNN forward/backward passes would be much slower.
+  - HPC Context: TensorFlow’s parallelism is HPC-relevant for large-scale time-series tasks (e.g., financial modeling).
+- Quantitative:
+  - Training might take ~15s; sequential implementation could take 5-10x longer.
+
+
+
+ Use of Existing Algorithms
+- Algorithm: Time-series regression via SimpleRNN.
+  - Model: 50-unit RNN + Dense for next-price prediction.
+  - Training: Gradient descent with Adam optimizer, MSE loss.
+- Sequential Equivalent: Manual RNN or simpler models (e.g., ARIMA).
+- Parallel: TensorFlow’s vectorized operations and potential multi-core/GPU parallelism.
+- Relevance: RNNs are standard for time-series; parallelism is HPC-relevant.
+
+
+
+ Performance Measurement
+- No Metrics:
+  - Lacks evaluation metrics (e.g., MSE, MAE) for predictions.
+  - Plot shows visual comparison but no quantitative error.
+- No Timing:
+  - Lacks `time.time()` to measure training/prediction time.
+  - Implicit parallelism isn’t quantified.
+- Improvement: Add MSE/MAE and timing for performance analysis.
+
+
+
+ Execution
+- In Jupyter Notebook:
+  - Run after installing dependencies:
+    ```bash
+    pip install numpy pandas matplotlib scikit-learn tensorflow
+    ```
+  - Output: Plot of real vs. predicted prices.
+- In Terminal:
+  - Save as `google_stock_rnn.py`.
+  - Run:
+    ```bash
+    python google_stock_rnn.py
+    ```
+
+
+
+ Limitations and Improvements
+- Limitations:
+  - Small dataset (~1200 samples) limits parallelism benefits.
+  - SimpleRNN (50 units) may underfit; no validation split.
+  - No evaluation metrics (e.g., MSE).
+  - Fixed parameters (5 epochs, 32 batch size).
+- Improvements:
+  - Add MSE/MAE for evaluation.
+  - Use LSTM/GRU for better performance.
+  - Add validation split and more epochs.
+  - Include timing for performance.
+
+
+
+ Relevance to HPC and Deep Learning
+- High Performance Computing:
+  - TensorFlow’s implicit parallelism (vectorization, CPU/GPU) aligns with HPC for large-scale ML.
+  - Moderate dataset limits benefits here.
+- Deep Learning:
+  - RNN for stock price prediction is a common time-series task.
+  - Framework scales to complex tasks (e.g., forecasting, NLP).
+
+
+
+ Summary
+- Code: Predicts Google stock prices using a SimpleRNN.
+- Parallelism: Implicit via TensorFlow’s vectorized operations, potentially multi-core/GPU.
+- Benefits: Faster than sequential loops for large data; moderate for ~1200 samples.
+- Execution: Run in Jupyter or as Python script; no compilation.
+- Use: Demonstrates time-series workflow (preprocessing, RNN training, visualization).
+
+If you want metrics, LSTM, or timing, let me know!
